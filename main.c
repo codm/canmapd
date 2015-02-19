@@ -15,7 +15,6 @@ int main(int argc, const char* argv[]) {
 
     /* run code */
     for(i=0; i < argc; i++) {
-        printf("arg %d: %s \n", i, argv[i]);
         if(!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-v")) {
                 verbose = 1;
         }
@@ -23,21 +22,27 @@ int main(int argc, const char* argv[]) {
                 run_daemon = 1;
         }
         else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
+            printf("%s daemon helptext. ", DAEMON_NAME);
+            printf("Daemon version %s. ", DAEMON_VERSION);
+            printf("Built %s %s\n", __DATE__, __TIME__);
+            printf("    --verbose (-v) Prints additional output to stdout\n");
+            printf("    --daemon  (-d) start as a daemon\n");
+            printf("    --help    (-h) prints this helptext\n");
+            exit(EXIT_SUCCESS);
         }
     }
 
     if(run_daemon) {
-        printf("daemon mode - ");
         /* fork off parent */
         pid = fork();
         /* not good */
         if(pid < 0) {
-            printf("error! exiting\n");
+            printf("[daemon] error! exiting\n");
             exit(EXIT_FAILURE);
         }
         /* good */
         if(pid > 0) {
-            printf("forked into pid %d\n", pid);
+            printf("[daemon] forked into pid %d\n", pid);
             exit(EXIT_SUCCESS);
         }
     }
@@ -58,7 +63,7 @@ int main(int argc, const char* argv[]) {
     syslog(LOG_INFO, "%s", "daemon successfully started");
     while(1) {
         /* main program loop */
-        sleep(20);
+        sleep(3);
         break;
     }
     syslog(LOG_INFO, "%s", "daemon successfully shut down");

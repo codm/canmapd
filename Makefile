@@ -1,2 +1,2 @@
 prog:
-	gcc -pedantic -Wall -o accessm main.c
+	gcc -pedantic -ansi -Wall -o accessm main.c
