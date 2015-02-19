@@ -1,2 +1,2 @@
 prog:
-	gcc -pedantic -Wall -o ibdoor main.c
+	gcc -pedantic -Wall -o accessm main.c
