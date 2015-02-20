@@ -3,7 +3,23 @@
    init global vars
 */
 pid_t pid, sid;
-MYSQL db;
+MYSQL *db;
+
+void sig_term(int sig) {
+    /* shutting down program properly */
+    syslog(LOG_INFO, "%s", "Sigterm received - shutting down");
+
+    /* kill mySQL Conn */
+    if(db != NULL) {
+        mysql_close(db);
+    }
+
+    /* closing log */
+    syslog(LOG_INFO, "%s", "Shutdown complete");
+    closelog();
+
+    exit(EXIT_SUCCESS);
+}
 
 /*
     main loop
@@ -30,6 +46,9 @@ int main(int argc, const char* argv[]) {
             exit(EXIT_SUCCESS);
         }
     }
+
+    /* register signal handlers */
+    signal(SIGTERM, sig_term);
 
     if(run_daemon) {
         /* fork off parent */
@@ -61,14 +80,14 @@ int main(int argc, const char* argv[]) {
 
     /* do ibdoor init stuff */
     /* init mysql daemon */
-    acm_mysql_connect(&db);
+    acm_mysql_connect(db);
     syslog(LOG_INFO, "%s", "daemon successfully started");
     while(1) {
         /* main program loop */
-        sleep(3);
-        break;
+        /*sleep(3);
+        break; */
     }
-    mysql_close(&db);
+    mysql_close(db);
     syslog(LOG_INFO, "%s", "daemon successfully shut down");
 
     return 0;
