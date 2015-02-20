@@ -2,10 +2,9 @@
 /*
    init global vars
 */
-int verbose = 0;
-int run_daemon = 0;
-
 pid_t pid, sid;
+MYSQL db;
+
 /*
     main loop
 */
@@ -52,20 +51,24 @@ int main(int argc, const char* argv[]) {
     /* open syslog for daemon */
     openlog("accessm", 0, LOG_USER);
 
-
-    sid = setsid();
-    if(sid < 0) {
-        syslog(LOG_ERR, "%s", "was not able to get session id");
-        exit(EXIT_FAILURE);
+    if(run_daemon) {
+        sid = setsid();
+        if(sid < 0) {
+            syslog(LOG_ERR, "%s", "was not able to get session id");
+            exit(EXIT_FAILURE);
+        }
     }
 
     /* do ibdoor init stuff */
+    /* init mysql daemon */
+    acm_mysql_connect(&db);
     syslog(LOG_INFO, "%s", "daemon successfully started");
     while(1) {
         /* main program loop */
         sleep(3);
         break;
     }
+    mysql_close(&db);
     syslog(LOG_INFO, "%s", "daemon successfully shut down");
 
     return 0;
