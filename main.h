@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <string.h>
 
+#include "mysql.c"
+
 /* Important defines */
 #define DAEMON_VERSION "0.3"
 #define DAEMON_NAME "accessm"
