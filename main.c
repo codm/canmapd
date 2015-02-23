@@ -27,6 +27,9 @@ void sig_term(int sig) {
 int main(int argc, const char* argv[]) {
     /* init vars */
     int i = 0;
+    int websock, conn;
+    struct sockaddr_in webserv, webclient;
+    socklen_t len;
 
     /* run code */
     for(i=0; i < argc; i++) {
@@ -81,11 +84,46 @@ int main(int argc, const char* argv[]) {
     /* do ibdoor init stuff */
     /* init mysql daemon */
     acm_mysql_connect(db);
+
+
+    /* init websocket */
+    websock = socket( AF_INET, SOCK_STREAM, 0 );
+    /* websock = socket( AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0 );*/
+    if(websock < 0) {
+        syslog(LOG_ERR, "was not able to initiate Websocket");
+        exit(EXIT_FAILURE);
+    }
+    memset(&webserv, 0, sizeof(webserv));
+    webserv.sin_family = AF_INET;
+    webserv.sin_addr.s_addr = inet_addr("127.0.0.1");
+    webserv.sin_port = htons(25005);
+    if(bind(websock, (struct sockaddr*)&webserv, sizeof(webserv)) < 0) {
+        syslog(LOG_ERR, "was not able to bind Webserver");
+        exit(EXIT_FAILURE);
+    }
+
+    if(listen(websock, 9) < 0) {
+        syslog(LOG_ERR, "not able to register Listen");
+        exit(EXIT_FAILURE);
+    }
+
+    /* TODO */
     syslog(LOG_INFO, "%s", "daemon successfully started");
     while(1) {
+        char webbuff[WEBSOCK_MAX_RECV];
+        int webbuffsize;
+
         /* main program loop */
-        /*sleep(3);
-        break; */
+        len = sizeof(webclient);
+        conn = accept(websock, (struct sockaddr*)&webclient, &len);
+        if(conn < 0) {
+        } else {
+            printf("connection from: %s\n", inet_ntoa(webclient.sin_addr));
+            if((webbuffsize = recv(conn, webbuff, WEBSOCK_MAX_RECV,0)) < 0)
+                printf("Fehler in websock recv");
+            webbuff[webbuffsize] = '\0';
+            printf("msg: %s \n", webbuff);
+        }
     }
     mysql_close(db);
     syslog(LOG_INFO, "%s", "daemon successfully shut down");
