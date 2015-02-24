@@ -16,7 +16,7 @@
 
 
 #include "globals.h"
-#include "mysql.c"
+#include "utils/mysql.c"
 
 /* Important defines */
 #define DAEMON_VERSION "0.3"
