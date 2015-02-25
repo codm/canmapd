@@ -4,6 +4,8 @@
 */
 pid_t pid, sid;
 MYSQL *db;
+pthread_t webthread;
+pthread_t canthread;
 
 void sig_term(int sig) {
     /* shutting down program properly */
@@ -13,6 +15,11 @@ void sig_term(int sig) {
     if(db != NULL) {
         mysql_close(db);
     }
+
+    /* signal queue threads *
+    pthread_kill(canthread, SIGTERM);
+    pthread_kill(webthread, SIGTERM);
+    */
 
     /* closing log */
     syslog(LOG_INFO, "%s", "Shutdown complete");
@@ -27,9 +34,7 @@ void sig_term(int sig) {
 int main(int argc, const char* argv[]) {
     /* init vars */
     int i = 0;
-    int websock, conn;
-    struct sockaddr_in webserv, webclient;
-    socklen_t len;
+    int rc;
 
     /* run code */
     for(i=0; i < argc; i++) {
@@ -87,43 +92,20 @@ int main(int argc, const char* argv[]) {
 
 
     /* init websocket */
-    websock = socket( AF_INET, SOCK_STREAM, 0 );
-    /* websock = socket( AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0 );*/
-    if(websock < 0) {
-        syslog(LOG_ERR, "was not able to initiate Websocket");
-        exit(EXIT_FAILURE);
-    }
-    memset(&webserv, 0, sizeof(webserv));
-    webserv.sin_family = AF_INET;
-    webserv.sin_addr.s_addr = inet_addr("127.0.0.1");
-    webserv.sin_port = htons(25005);
-    if(bind(websock, (struct sockaddr*)&webserv, sizeof(webserv)) < 0) {
-        syslog(LOG_ERR, "was not able to bind Webserver");
-        exit(EXIT_FAILURE);
+    rc = pthread_create(&webthread, NULL, &websock_run, NULL);
+    if(rc < 0) {
+        printf("Not able to initiale Websock thread");
     }
 
-    if(listen(websock, 9) < 0) {
-        syslog(LOG_ERR, "not able to register Listen");
-        exit(EXIT_FAILURE);
+
+    rc = pthread_create(&canthread, NULL, &cansock_run, NULL);
+    if(rc < 0) {
+        printf("Not able to initiale cansock thread");
     }
 
-    /* TODO */
-    syslog(LOG_INFO, "%s", "daemon successfully started");
+    syslog(LOG_INFO, "%s (%s) %s", DAEMON_NAME, DAEMON_VERSION, "started");
     while(1) {
-        char webbuff[WEBSOCK_MAX_RECV];
-        int webbuffsize;
-
-        /* main program loop */
-        len = sizeof(webclient);
-        conn = accept(websock, (struct sockaddr*)&webclient, &len);
-        if(conn < 0) {
-        } else {
-            printf("connection from: %s\n", inet_ntoa(webclient.sin_addr));
-            if((webbuffsize = recv(conn, webbuff, WEBSOCK_MAX_RECV,0)) < 0)
-                printf("Fehler in websock recv");
-            webbuff[webbuffsize] = '\0';
-            printf("msg: %s \n", webbuff);
-        }
+        sleep(3);
     }
     mysql_close(db);
     syslog(LOG_INFO, "%s", "daemon successfully shut down");

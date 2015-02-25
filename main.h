@@ -1,25 +1,19 @@
-#define MAIN
+#ifndef MAIN_H
+#define MAIN_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <syslog.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <string.h>
-#include <mysql.h>
-#include <signal.h>
-
-
+#define MAIN_GL
 #include "globals.h"
+#undef MAIN_GL
+
+#include "websock.c"
+#include "cansock.c"
 #include "utils/mysql.c"
 
 /* Important defines */
 #define DAEMON_VERSION "0.3"
 #define DAEMON_NAME "accessm"
 
-#define WEBSOCK_MAX_RECV 1024
+
+static void *websock_run();
+static void *cansock_run();
+#endif
