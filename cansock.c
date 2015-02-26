@@ -4,9 +4,10 @@ void cansock_sighand(int sig) {
 
 
 static void *cansock_run() {
-    /* TODO: Stuff */
+    /* TODO: 
+        acceptable signal handling !!! */
     syslog(LOG_INFO, "cansock thread started");
-    signal(SIGTERM, cansock_sighand);
+    /* signal(SIGTERM, cansock_sighand); */
     while(1) {
         sleep(10);
     }

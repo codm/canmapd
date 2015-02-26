@@ -10,12 +10,15 @@ void websock_sig(int sig) {
 }
 
 static void *websock_run() {
+    /* TODO:
+       acceptable signal handling 
+    */
     /* Declarations */
     struct sockaddr_in webserv, webclient;
     socklen_t len;
 
-    /* add signal handler websock_sig */
-    signal(SIGTERM, websock_sig);
+    /* add signal handler websock_sig
+    signal(SIGTERM, websock_sig); */
 
     /* initiate websock */
     websock = socket(AF_INET, SOCK_STREAM, 0);
