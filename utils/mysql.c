@@ -4,7 +4,7 @@
 
 int acm_mysql_connect(MYSQL *db) {
     /* initialize databse */
-    db = mysql_init(NULL);
+    db = mysql_init(db);
     if(db == NULL) {
         syslog(LOG_ERR, "%s", "mysql object cannot be initialized");
         return 0;
@@ -13,7 +13,7 @@ int acm_mysql_connect(MYSQL *db) {
                 db,
                 NULL,
                 "root",
-                "codm",
+                "codmysql",
                 "ibdoor",
                 0,
                 NULL,
@@ -24,4 +24,24 @@ int acm_mysql_connect(MYSQL *db) {
     }
     return 0;
 }
+
+
+int acm_mysql_getUsers(MYSQL *db, MYSQL_RES *res)
+{
+    char *str;
+
+    if(db == NULL) {
+        syslog(LOG_ERR, "cannot connect because mysql is not initialized");
+        return 1;
+    }
+
+    str = "SELECT * FROM ibdoor_user";
+    mysql_real_query(db, str, strlen(str));
+
+    res = mysql_store_result(db);
+
+    return 0;
+}
+
+
 

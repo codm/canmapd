@@ -3,7 +3,6 @@
    init global vars
 */
 pid_t pid, sid;
-MYSQL *db;
 pthread_t webthread;
 pthread_t canthread;
 
@@ -14,6 +13,7 @@ void sig_term(int sig) {
     /* kill mySQL Conn */
     if(db != NULL) {
         mysql_close(db);
+        free(db);
     }
 
     /* signal queue threads *
@@ -35,6 +35,7 @@ int main(int argc, const char* argv[]) {
     /* init vars */
     int i = 0;
     int rc;
+    MYSQL_RES *res;
 
     /* run code */
     for(i=0; i < argc; i++) {
@@ -48,6 +49,7 @@ int main(int argc, const char* argv[]) {
             printf("%s daemon helptext. ", DAEMON_NAME);
             printf("Daemon version %s. ", DAEMON_VERSION);
             printf("Built %s %s\n", __DATE__, __TIME__);
+            printf("(c) cod.m GmbH\n");
             printf("    --verbose (-v) Prints additional output to stdout\n");
             printf("    --daemon  (-d) start as a daemon\n");
             printf("    --help    (-h) prints this helptext\n");
@@ -88,7 +90,11 @@ int main(int argc, const char* argv[]) {
 
     /* do ibdoor init stuff */
     /* init mysql daemon */
+    /*acm_mysql_connect(db);*/
+    db = (MYSQL *) malloc(sizeof(MYSQL));
+    res = (MYSQL_RES *) malloc(sizeof(MYSQL_RES));
     acm_mysql_connect(db);
+    acm_mysql_getUsers(db, res);
 
 
     /* init websocket */
