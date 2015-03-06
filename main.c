@@ -29,6 +29,20 @@ void sig_term(int sig) {
 }
 
 /*
+   print help text
+   */
+void print_helptext() {
+    printf("%s daemon helptext. ", DAEMON_NAME);
+    printf("Daemon version %s. ", DAEMON_VERSION);
+    printf("Built %s %s\n", __DATE__, __TIME__);
+    printf("(c) cod.m GmbH\n");
+    printf("    --verbose (-v) Prints additional output to stdout\n");
+    printf("    --daemon  (-d) start as a daemon\n");
+    printf("    --help    (-h) prints this helptext\n");
+    exit(EXIT_SUCCESS);
+}
+
+/*
     main loop
 */
 int main(int argc, const char* argv[]) {
@@ -36,24 +50,23 @@ int main(int argc, const char* argv[]) {
     int i = 0;
     int rc;
     MYSQL_RES *res;
+    CANFRAME dummy;
+    OPENER_REQUEST op;
+
+    dummy.can_id = 0xFF;
+    dummy.can_dlc = 8;
+    dummy.data = { 0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF };
 
     /* run code */
     for(i=0; i < argc; i++) {
         if(!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-v")) {
-                verbose = 1;
+            verbose = 1;
         }
         else if (!strcmp(argv[i], "--run_daemon") || !strcmp(argv[i], "-d")) {
-                run_daemon = 1;
+            run_daemon = 1;
         }
         else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
-            printf("%s daemon helptext. ", DAEMON_NAME);
-            printf("Daemon version %s. ", DAEMON_VERSION);
-            printf("Built %s %s\n", __DATE__, __TIME__);
-            printf("(c) cod.m GmbH\n");
-            printf("    --verbose (-v) Prints additional output to stdout\n");
-            printf("    --daemon  (-d) start as a daemon\n");
-            printf("    --help    (-h) prints this helptext\n");
-            exit(EXIT_SUCCESS);
+            print_helptext();
         }
     }
 

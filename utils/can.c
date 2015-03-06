@@ -1,0 +1,3 @@
+/*
+   CAN helper functions for ibdoor C daemon
+*/

@@ -15,6 +15,7 @@
 #include <mysql.h>
 #include <signal.h>
 #include <pthread.h>
+#include <linux/can.h>
 
 #ifdef MAIN_GL
 #define EXT
@@ -22,9 +23,18 @@
 #define EXT extern
 #endif
 
-EXT short verbose; /* defines if program runs in verbose mode */
-EXT short run_daemon; /* defines if program runs in daemon mode */
+EXT uint8_t verbose; /* defines if program runs in verbose mode */
+EXT uint8_t run_daemon; /* defines if program runs in daemon mode */
 
-EXT MYSQL *db;
+EXT uint8_t MYSQL *db;
+
+typedef struct can_frame CANFRAME;
+
+typedef struct {
+    uint8_t sender;
+    uint8_t receiver;
+    uint8_t opener;
+    uint8_t iButton_Serial;
+} OPENER_REQUEST;
 
 #endif
