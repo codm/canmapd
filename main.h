@@ -8,6 +8,7 @@
 #include "websock.c"
 #include "cansock.c"
 #include "utils/mysql.c"
+#include "utils/can.c"
 
 /* Important defines */
 #define DAEMON_VERSION "0.3"

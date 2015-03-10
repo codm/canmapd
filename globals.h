@@ -26,15 +26,15 @@
 EXT uint8_t verbose; /* defines if program runs in verbose mode */
 EXT uint8_t run_daemon; /* defines if program runs in daemon mode */
 
-EXT uint8_t MYSQL *db;
+EXT MYSQL *db;
 
 typedef struct can_frame CANFRAME;
 
 typedef struct {
     uint8_t sender;
     uint8_t receiver;
-    uint8_t opener;
-    uint8_t iButton_Serial;
-} OPENER_REQUEST;
+    uint8_t command;
+    uint8_t data[6];
+} ACM_CANMESSAGE;
 
 #endif
