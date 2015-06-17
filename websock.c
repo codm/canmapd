@@ -11,7 +11,7 @@ void websock_sig(int sig) {
 
 static void *websock_run() {
     /* TODO:
-       acceptable signal handling 
+       acceptable signal handling
     */
     /* Declarations */
     struct sockaddr_in webserv, webclient;

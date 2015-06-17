@@ -50,27 +50,7 @@ int main(int argc, const char* argv[]) {
     int i = 0;
     int rc;
     MYSQL_RES *res;
-    CANFRAME dummy;
-    ACM_CANMESSAGE msg;
 
-    dummy.can_id = 0xFE;
-    dummy.can_dlc = 8;
-    dummy.data[0] = 0x01;
-    dummy.data[1] = 0x01;
-    dummy.data[2] = 0xBE;
-    dummy.data[3] = 0xEF;
-    dummy.data[4] = 0xDE;
-    dummy.data[5] = 0xAD;
-    dummy.data[6] = 0xBE;
-    dummy.data[7] = 0xF0;
-
-    translate_frame(&dummy, &msg);
-
-    printf("can: id: %d; data: %X %X %X %X %X %X %X %X \n", dummy.can_id, dummy.data[0], dummy.data[1], dummy.data[2], 
-            dummy.data[3], dummy.data[4], dummy.data[5], dummy.data[6], dummy.data[7]);
-
-    printf("can: sender: %d; receiver: %X; command: %X; data: %X %X %X %X %X %X \n", msg.sender, msg.receiver, 
-            msg.command, msg.data[0], msg.data[1], msg.data[2], msg.data[3], msg.data[4], msg.data[5]);
     /* run code */
     for(i=0; i < argc; i++) {
         if(!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-v")) {
