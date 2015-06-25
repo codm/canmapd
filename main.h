@@ -5,16 +5,13 @@
 #include "globals.h"
 #undef MAIN_GL
 
-#include "websock.c"
-#include "cansock.c"
-#include "utils/mysql.c"
-#include "utils/can.c"
+#include "websock.h"
+#include "cansock.h"
+#include "mysql.c"
 
 /* Important defines */
 #define DAEMON_VERSION "0.1"
 #define DAEMON_NAME "accessm"
 
-
-static void *websock_run();
-static void *cansock_run();
 #endif
+

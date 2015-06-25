@@ -30,7 +30,24 @@ THE SOFTWARE.
    @date    24.6.2015
 */
 
+#ifndef _ISOTP_H
+#define _ISOTP_H
+
+#include "globals.h"
 #include <linux/can.h>
+#include <linux/if.h>
+#include <sys/ioctl.h>
+
+/*
+   Defines
+*/
+
+#define ISOTP_BUFFER_SIZE 20
+
+#define ISOTP_STATUS_SF 0x00
+#define ISOTP_STATUS_FF 0x01
+#define ISOTP_STATUS_CF 0x02
+#define ISOTP_STATUS_FC 0x03
 
 /**
   \brief Abstract struct of a ISO-TP frame
@@ -41,7 +58,12 @@ struct isotp_frame {
     uint8_t rec; /**< Receiver-ID of ISO-TP Frame */
     uint8_t dl; /**< Length of ISO-TP Frame */
     uint8_t* data; /**< Data Pointer of ISO-TP Frame */
-}
+};
+
+/**
+  \brief !MANDATORY! init the needed isotp data structs
+*/
+void isotp_init();
 
 /**
   \brief computes can_frame into internal buffer
@@ -55,7 +77,7 @@ struct isotp_frame {
   @return < 0 for error, 0 if there are still messages to come
             1 if the isotp_frame is finished and ready to get
 */
-int isotp_compute_frame(can_frame *frame);
+int isotp_compute_frame(struct can_frame *frame);
 
 /**
   \brief sends an isotp frame over socket
@@ -67,7 +89,7 @@ int isotp_compute_frame(can_frame *frame);
           EXIT_FAILURE for failure
 
 */
-int isotp_send_frame(isotp_frame *frame);
+int isotp_send_frame(struct isotp_frame *frame);
 
 /**
   \brief gets a finished ISO-TP frame for further computation
@@ -77,5 +99,7 @@ int isotp_send_frame(isotp_frame *frame);
   @return EXIT_SUCCESS for success
           EXIT_FAILURE for failure
 */
-int isotp_get_frame(isotp_frame **dst);
+int isotp_get_frame(struct isotp_frame *dst);
+
+#endif
 

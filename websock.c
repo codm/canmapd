@@ -9,7 +9,7 @@ void websock_sig(int sig) {
     exit(EXIT_SUCCESS);
 }
 
-static void *websock_run() {
+void *websock_run() {
     /* TODO:
        acceptable signal handling
     */
