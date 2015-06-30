@@ -43,12 +43,17 @@ typedef struct {
     struct isotp_frame frame;
     uint8_t finished;
     uint8_t free;
+    uint8_t *data_ptr; /* pointer to place in frame.data where to write */
+    uint16_t data_iter; /* count of written data */
+    struct can_frame canframes[ISOTP_BLOCKSIZE];
+    uint8_t block_counter;
 } isotpbuff_t;
 
 isotpbuff_t isotp_buffer[ISOTP_BUFFER_SIZE];
 
 int _buff_get_next_free(isotpbuff_t **dst);
 int _buff_get_finished(isotpbuff_t **dst);
+int _buff_get_pending(isotpbuff_t **dst, uint8_t senderID);
 
 /**
   Program Code
@@ -63,18 +68,21 @@ void isotp_init(void) {
 }
 
 int isotp_compute_frame(struct can_frame *frame) {
-    uint8_t i, status, dl;
+    uint8_t i, status, dl, sender, receiver;
     uint8_t *dataptr;
     isotpbuff_t *dst;
 
     status = (frame->data[1] & 0xF0) >> 4;
+    sender = frame->data[0];
+    receiver = (frame->can_id & CAN_SFF_MASK);
     switch(status) {
         case ISOTP_STATUS_SF:
             /* if single frame */
             if(_buff_get_next_free(&dst)) {
                 dst->free = 0;
-                dst->frame.sender = (frame->can_id & CAN_SFF_MASK);
-                dst->frame.rec = frame->data[0];
+                dst->finished = 1;
+                dst->frame.sender = sender;
+                dst->frame.rec = receiver;
                 dl = (frame->data[1] & 0x0F);
                 dst->frame.dl = dl;
                 dst->frame.data = malloc(dl * sizeof(uint8_t));
@@ -94,16 +102,15 @@ int isotp_compute_frame(struct can_frame *frame) {
             /* if first frame */
             if(_buff_get_next_free(&dst)) {
                 dst->free = 0;
-                dst->frame.sender = (frame->can_id & CAN_SFF_MASK);
-                dst->frame.rec = frame->data[0];
+                dst->finished = 0;
+                dst->frame.sender = sender;
+                dst->frame.rec = receiver;
                 dl = ((frame->data[1] & 0x0F) << 8) + frame->data[2];
                 dst->frame.dl = dl;
                 dst->frame.data = malloc(dl * sizeof(uint8_t));
-                dataptr = dst->frame.data;
-                for(i = 2; i < (dl+2); i++) {
-                    *dataptr = frame->data[i];
-                    dataptr++;
-                }
+                dst->data_ptr = &dst->frame.data[0];
+                memcpy(&dst->canframes[0], frame, sizeof(struct can_frame));
+                dst->data_iter = 5;
                 return 0;
             }
             else {
@@ -112,7 +119,30 @@ int isotp_compute_frame(struct can_frame *frame) {
             }
         case ISOTP_STATUS_CF:
             /* if first frame */
-            return 0;
+            if(_buff_get_pending(&dst, sender)) {
+                /* copy frame to canframes at right point */
+                int sequenceNr = frame->data[1] & 0x0F;
+                memcpy(&dst->canframes[sequenceNr], frame, sizeof(struct can_frame));
+                dst->data_iter += frame->can_dlc - 2;
+                dst->block_counter++;
+                if(dst->data_iter == dst->frame.dl) {
+                    /* transmission finished */
+                    dst->finished = 1;
+                    /* copy canframes to frame->data */
+                    return 1;
+                }
+                if(dst->block_counter >= ISOTP_BLOCKSIZE) {
+                    /* maximum blocks saved */
+                    /* copy canframes to frame->data */
+                    /* send flow control */
+                    dst->block_counter = 0;
+                }
+                return 0;
+            }
+            else {
+                /* no buffer found */
+                return -1;
+            }
     }
     /* if the code comes till here, something is very broken */
     return -1;
@@ -165,3 +195,14 @@ int _buff_get_finished(isotpbuff_t **dst) {
     return 0;
 }
 
+int _buff_get_pending(isotpbuff_t **dst, uint8_t senderID) {
+    int i;
+    for(i = 0; i < ISOTP_BUFFER_SIZE; i++) {
+        if(!isotp_buffer[i].finished && !isotp_buffer[i].free
+                && isotp_buffer[i].frame.sender == senderID) {
+            *dst = &isotp_buffer[i];
+            return 1;
+        }
+    }
+    return 0;
+}
