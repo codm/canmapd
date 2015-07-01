@@ -54,6 +54,9 @@ isotpbuff_t isotp_buffer[ISOTP_BUFFER_SIZE];
 int _buff_get_next_free(isotpbuff_t **dst);
 int _buff_get_finished(isotpbuff_t **dst);
 int _buff_get_pending(isotpbuff_t **dst, uint8_t senderID);
+void _buff_transfer_canframes(isotpbuff_t *dst);
+void _buff_reset_field(isotpbuff_t *dst);
+void _buff_reset_canframes(isotpbuff_t *dst);
 
 /**
   Program Code
@@ -62,8 +65,7 @@ int _buff_get_pending(isotpbuff_t **dst, uint8_t senderID);
 void isotp_init(void) {
     int i;
     for(i = 0; i < ISOTP_BUFFER_SIZE; i++) {
-        isotp_buffer[i].finished = 0;
-        isotp_buffer[i].free = 1;
+        _buff_reset_field(&isotp_buffer[i]);
     }
 }
 
@@ -108,9 +110,10 @@ int isotp_compute_frame(struct can_frame *frame) {
                 dl = ((frame->data[1] & 0x0F) << 8) + frame->data[2];
                 dst->frame.dl = dl;
                 dst->frame.data = malloc(dl * sizeof(uint8_t));
-                dst->data_ptr = &dst->frame.data[0];
+                dst->data_ptr = dst->frame.data;
                 memcpy(&dst->canframes[0], frame, sizeof(struct can_frame));
                 dst->data_iter = 5;
+                dst->block_counter = 1;
                 return 0;
             }
             else {
@@ -129,13 +132,16 @@ int isotp_compute_frame(struct can_frame *frame) {
                     /* transmission finished */
                     dst->finished = 1;
                     /* copy canframes to frame->data */
+                    _buff_transfer_canframes(dst);
                     return 1;
                 }
                 if(dst->block_counter >= ISOTP_BLOCKSIZE) {
                     /* maximum blocks saved */
                     /* copy canframes to frame->data */
-                    /* send flow control */
+                    _buff_transfer_canframes(dst);
+                    _buff_reset_canframes(dst);
                     dst->block_counter = 0;
+                    /* send flow control */
                 }
                 return 0;
             }
@@ -160,12 +166,7 @@ int isotp_get_frame(struct isotp_frame *dst) {
         memcpy(dst->data, fin->frame.data, fin->frame.dl * sizeof(uint8_t));
 
         /* uninit struct */
-        fin->frame.sender = 0;
-        fin->frame.rec = 0;
-        fin->frame.dl = 0;
-        free(fin->frame.data);
-        fin->finished = 0;
-        fin->free = 1;
+        _buff_reset_field(fin);
         return 1;
     }
     else {
@@ -206,3 +207,43 @@ int _buff_get_pending(isotpbuff_t **dst, uint8_t senderID) {
     }
     return 0;
 }
+
+void _buff_transfer_canframes(isotpbuff_t *dst) {
+    int i = 0, k = 0;
+    for(i = 0; i < ISOTP_BLOCKSIZE; i++) {
+        if(dst->canframes[i].can_dlc > 0) {
+            if((dst->canframes[i].data[1] >> 4) == ISOTP_STATUS_FF)
+                k = 3;
+            else
+                k = 2;
+            for(;k < dst->canframes[i].can_dlc; k++) {
+                *(dst->data_ptr) = dst->canframes[i].data[k];
+                dst->data_ptr++;
+            }
+        }
+    }
+}
+
+void _buff_reset_field(isotpbuff_t *dst) {
+    dst->finished = 0;
+    dst->free = 1;
+    dst->data_iter = 0;
+    dst->block_counter = 0;
+    dst->frame.sender = 0;
+    dst->frame.rec = 0;
+    dst->frame.dl = 0;
+    free(dst->frame.data);
+    _buff_reset_canframes(dst);
+}
+
+void _buff_reset_canframes(isotpbuff_t *dst) {
+    int i,k;
+    for(i = 0; i < ISOTP_BLOCKSIZE; i++) {
+        dst->canframes[i].can_id = 0;
+        dst->canframes[i].can_dlc = 0;
+        for(k = 0; k < 8; k++) {
+            dst->canframes[i].data[k] = 0;
+        }
+    }
+}
+
