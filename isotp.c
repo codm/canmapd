@@ -70,7 +70,8 @@ void isotp_init(void) {
 }
 
 int isotp_compute_frame(struct can_frame *frame) {
-    uint8_t i, status, dl, sender, receiver;
+    uint8_t i, status, sender, receiver;
+    uint16_t dl;
     uint8_t *dataptr;
     isotpbuff_t *dst;
 

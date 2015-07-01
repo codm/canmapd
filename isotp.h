@@ -57,7 +57,7 @@ THE SOFTWARE.
 struct isotp_frame {
     uint8_t sender; /**< Sender-ID of ISO-TP Frame */
     uint8_t rec; /**< Receiver-ID of ISO-TP Frame */
-    uint8_t dl; /**< Length of ISO-TP Frame */
+    uint16_t dl; /**< Length of ISO-TP Frame */
     uint8_t* data; /**< Data Pointer of ISO-TP Frame */
 };
 
