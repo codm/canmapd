@@ -21,6 +21,8 @@ void *isotprecv_run(void) {
     syslog(LOG_INFO, "canreceive process started");
     signal(SIGTERM, isotprecv_sighand);
 
+    isotp_init();
+
 
     while(1) {
         nbytes = read(cansocket, &frame, sizeof(struct can_frame));

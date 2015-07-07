@@ -162,11 +162,12 @@ int main(int argc, const char* argv[]) {
     /**
       * Write Syslog and go into main loop
       */
+    pid = getpid();
 
     /* install sighandle for main process */
     signal(SIGTERM, sig_term);
-
     syslog(LOG_INFO, "%s (%s) %s", DAEMON_NAME, DAEMON_VERSION, "started");
+    printf("PIDs: main: %d / isotprecv: %d / isotpsend: %d\n", pid, isotprecvpid, isotpsendpid);
     while(1) {
         sleep(3);
     }
