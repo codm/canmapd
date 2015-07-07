@@ -12,9 +12,11 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
-#include <mysql.h>
 #include <signal.h>
 #include <pthread.h>
+#include <linux/can.h>
+#include <linux/if.h>
+#include <sys/ioctl.h>
 
 #ifdef MAIN_GL
 #define EXT
@@ -25,6 +27,5 @@
 EXT uint8_t verbose; /* defines if program runs in verbose mode */
 EXT uint8_t run_daemon; /* defines if program runs in daemon mode */
 
-EXT MYSQL *db;
 
 #endif
