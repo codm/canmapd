@@ -31,12 +31,8 @@ void *isotprecv_run(void) {
         }
         else if (nbytes == sizeof(struct can_frame)) {
             int status;
-            printf("+ id: %X l: %d data: %X %X %X %X %X %X %X %X \n",
-                (frame.can_id & CAN_SFF_MASK), frame.can_dlc,
-                frame.data[0], frame.data[1], frame.data[2], frame.data[3],
-                frame.data[4], frame.data[5], frame.data[6], frame.data[7]);
-            status = isotp_compute_frame(&frame);
-            if(status > 0) {
+            status = isotp_compute_frame(&cansocket, &frame);
+            if(status == ISOTP_COMPRET_COMPLETE) {
                 if(isotp_get_frame(&isoframe)) {
                     printf("+ iso send:%x rec:%x l:%d data: %x %x %x %x %x %x \n",
                         isoframe.sender, isoframe.rec, isoframe.dl,
@@ -44,10 +40,11 @@ void *isotprecv_run(void) {
                         isoframe.data[3], isoframe.data[4], isoframe.data[5]);
                 }
             }
-            else if (status < 0) {
-                /* no ISO-TP Frame */
-            }
-            else {
+            else if(status == ISOTP_COMPRET_ERROR) {
+                printf("ERROR id: %X l: %d data: %X %X %X %X %X %X %X %X \n",
+                    (frame.can_id & CAN_SFF_MASK), frame.can_dlc,
+                    frame.data[0], frame.data[1], frame.data[2], frame.data[3],
+                    frame.data[4], frame.data[5], frame.data[6], frame.data[7]);
                 /* ISO-TP msg still in transmission */
             }
         }

@@ -42,13 +42,22 @@ THE SOFTWARE.
    Defines
 */
 
-#define ISOTP_BUFFER_SIZE 20
-#define ISOTP_BLOCKSIZE 16
+#define ISOTP_BUFFER_SIZE        20      /* Buffer size can be chosen freely */
+#define ISOTP_BLOCKSIZE          4       /* Maximum 16 Blocks  */
+#define ISOTP_MIN_SEP_TIME       10      /* Min 10ms Seperation time  */
 
-#define ISOTP_STATUS_SF 0x00
-#define ISOTP_STATUS_FF 0x01
-#define ISOTP_STATUS_CF 0x02
-#define ISOTP_STATUS_FC 0x03
+#define ISOTP_STATUS_SF          0x00    /* Single Frame */
+#define ISOTP_STATUS_FF          0x01    /* First Frame */
+#define ISOTP_STATUS_CF          0x02    /* Consecutive Frames */
+#define ISOTP_STATUS_FC          0x03    /* Flow Control Frame */
+
+#define ISOTP_COMPRET_COMPLETE   1       /* Transmission Complete */
+#define ISOTP_COMPRET_TRANS      0       /* Transmission pending... */
+#define ISOTP_COMPRET_ERROR      -1      /* No ISO-TP Frame or no fre buffer */
+
+#define ISOTP_FLOWSTAT_CLEAR     0
+#define ISOTP_FLOWSTAT_WAIT      1
+#define ISOTP_FLOWSTAT_OVERFLOW  2
 
 /**
   \brief Abstract struct of a ISO-TP frame
@@ -64,6 +73,8 @@ struct isotp_frame {
 /**
   \brief !MANDATORY! init the needed isotp data structs
 */
+
+
 void isotp_init();
 
 /**
@@ -73,24 +84,25 @@ void isotp_init();
   the funtions returns status > 0. If there are still messages missing
   the function returns 0 and -1 if there was an error executing
 
+  @param[0] int *socket        pointer to an open CAN_SOCKET
   @param[0] can_frame *frame can frame to be processed
 
   @return < 0 for error, 0 if there are still messages to come
             1 if the isotp_frame is finished and ready to get
 */
-int isotp_compute_frame(struct can_frame *frame);
+int isotp_compute_frame(int *socket, struct can_frame *frame);
 
 /**
   \brief sends an isotp frame over socket
 
-  @param[0] int *socket pointer to an open CAN_SOCKET
+  @param[0] int *socket        pointer to an open CAN_SOCKET
   @param[0] isotp_frame *frame frame to be sent
 
   @return EXIT_SUCCESS for success
           EXIT_FAILURE for failure
 
 */
-int isotp_send_frame(struct isotp_frame *frame);
+int isotp_send_frame(int *socket, struct isotp_frame *frame);
 
 /**
   \brief gets a finished ISO-TP frame for further computation

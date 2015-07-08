@@ -69,15 +69,24 @@ void isotp_init(void) {
     }
 }
 
-int isotp_compute_frame(struct can_frame *frame) {
+int isotp_compute_frame(int *socket, struct can_frame *frame) {
     uint8_t i, status, sender, receiver;
     uint16_t dl;
     uint8_t *dataptr;
     isotpbuff_t *dst;
+    struct can_frame flowcontrol;
 
     status = (frame->data[1] & 0xF0) >> 4;
     sender = frame->data[0];
     receiver = (frame->can_id & CAN_SFF_MASK);
+
+    flowcontrol.can_id = sender;
+    flowcontrol.can_dlc = 4;
+    flowcontrol.data[0] = receiver;
+    flowcontrol.data[1] = ((ISOTP_STATUS_FC << 4)|ISOTP_FLOWSTAT_CLEAR);
+    flowcontrol.data[2] = ISOTP_BLOCKSIZE;
+    flowcontrol.data[3] = ISOTP_MIN_SEP_TIME;
+
     switch(status) {
         case ISOTP_STATUS_SF:
             /* if single frame */
@@ -95,11 +104,11 @@ int isotp_compute_frame(struct can_frame *frame) {
                     dataptr++;
                 }
                 dst->finished = 1;
-                return 1;
+                return ISOTP_COMPRET_COMPLETE;
             }
             else {
                 /* no free buffer */
-                return -1;
+                return ISOTP_COMPRET_ERROR;
             }
         case ISOTP_STATUS_FF:
             /* if first frame */
@@ -115,11 +124,14 @@ int isotp_compute_frame(struct can_frame *frame) {
                 memcpy(&dst->canframes[0], frame, sizeof(struct can_frame));
                 dst->data_iter = 5;
                 dst->block_counter = 1;
-                return 0;
+                if(write(*socket, &flowcontrol, sizeof(struct can_frame)) < 1) {
+                    return ISOTP_COMPRET_ERROR;
+                }
+                return ISOTP_COMPRET_TRANS;
             }
             else {
                 /* no free buffer */
-                return -1;
+                return ISOTP_COMPRET_ERROR;
             }
         case ISOTP_STATUS_CF:
             /* if first frame */
@@ -134,7 +146,7 @@ int isotp_compute_frame(struct can_frame *frame) {
                     dst->finished = 1;
                     /* copy canframes to frame->data */
                     _buff_transfer_canframes(dst);
-                    return 1;
+                    return ISOTP_COMPRET_COMPLETE;
                 }
                 if(dst->block_counter >= ISOTP_BLOCKSIZE) {
                     /* maximum blocks saved */
@@ -142,17 +154,20 @@ int isotp_compute_frame(struct can_frame *frame) {
                     _buff_transfer_canframes(dst);
                     _buff_reset_canframes(dst);
                     dst->block_counter = 0;
-                    /* send flow control */
+                    /* send flowcontrol */
+                    if(write(*socket, &flowcontrol, sizeof(struct can_frame)) < 1) {
+                        return ISOTP_COMPRET_ERROR;
+                    }
                 }
-                return 0;
+                return ISOTP_COMPRET_TRANS;
             }
             else {
                 /* no buffer found */
-                return -1;
+                return ISOTP_COMPRET_ERROR;
             }
     }
     /* if the code comes till here, something is very broken */
-    return -1;
+    return ISOTP_COMPRET_ERROR;
 }
 
 int isotp_get_frame(struct isotp_frame *dst) {

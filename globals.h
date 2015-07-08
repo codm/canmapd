@@ -24,8 +24,11 @@
 #define EXT extern
 #endif
 
+#define GL_OWN_CAN_ID 0x00
+
 EXT uint8_t verbose; /* defines if program runs in verbose mode */
 EXT uint8_t run_daemon; /* defines if program runs in daemon mode */
+
 
 
 #endif
