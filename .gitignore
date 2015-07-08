@@ -3,3 +3,5 @@
 .gitignore
 accessm
 .*DS_Store
+
+*.o
