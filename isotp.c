@@ -263,3 +263,40 @@ void _buff_reset_canframes(isotpbuff_t *dst) {
     }
 }
 
+int isotp_fr2str(char *dst, struct isotp_frame *src) {
+    char *buffer = dst;
+    int i, n;
+    n = sprintf(buffer, "%02x;", src->sender);
+    buffer = buffer+n;
+    n = sprintf(buffer, "%02x;", src->rec);
+    buffer = buffer+n;
+    n = sprintf(buffer, "%04u;", src->dl);
+    buffer = buffer+n;
+    for(i = 0; i < src->dl; i++) {
+        n = sprintf(buffer, "%02x", src->data[i]);
+        buffer = buffer+n;
+    }
+    return 1;
+}
+
+int isotp_str2fr(char *src, struct isotp_frame *dst) {
+    unsigned int i, sender, rec, dl;
+    uint8_t *bufdst;
+    char buffer[2*4096]; /* 4096 uint8_t a 2 characters */
+    char *bufbuff = buffer;
+    sscanf(src, "%02x;%02x;%04u;%s", &sender, &rec, &dl, buffer);
+    dst->sender = (uint8_t)sender;
+    dst->rec = (uint8_t)rec;
+    dst->dl = (uint8_t)dl;
+    dst->data = malloc(sizeof(uint8_t) * dst->dl);
+    bufdst = dst->data;
+    for(i = 0; i < dst->dl; i++) {
+        sscanf(bufbuff, "%02x", &rec); /* read 2 chars put into byte */
+        *bufdst = (uint8_t)rec;
+        bufdst++; /* iterate over array */
+        bufbuff = bufbuff + 2; /* iterate over 2 chars in string */
+    }
+    return 1;
+}
+
+

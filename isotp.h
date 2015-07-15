@@ -114,5 +114,7 @@ int isotp_send_frame(int *socket, struct isotp_frame *frame);
 */
 int isotp_get_frame(struct isotp_frame *dst);
 
+int isotp_fr2str(char *dst, struct isotp_frame *src);
+int isotp_str2fr(char *src, struct isotp_frame *dst);
 #endif
 
