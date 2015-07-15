@@ -38,7 +38,6 @@ void print_helptext() {
 */
 int main(int argc, const char* argv[]) {
     /* init vars */
-    struct sockaddr_in webserv;
     struct sockaddr_can addr;
     struct ifreq ifr;
     int i = 0;
@@ -116,28 +115,7 @@ int main(int argc, const char* argv[]) {
     addr.can_ifindex = ifr.ifr_ifindex;
     bind(cansocket, (struct sockaddr *)&addr, sizeof(addr));
 
-    /*
-       WEBSOCKET
-    */
-    websocket = socket(AF_INET, SOCK_STREAM, 0);
-    if(websocket < 0) {
-        syslog(LOG_ERR, "was not able to initiate websocket");
-        exit(EXIT_FAILURE);
-    }
 
-    /* bind server */
-    memset(&webserv, 0, sizeof(webserv));
-    webserv.sin_family = AF_INET;
-    webserv.sin_addr.s_addr = inet_addr("127.0.0.1");
-    webserv.sin_port = htons(25005);
-    if(bind(websocket, (struct sockaddr*)&webserv, sizeof(webserv)) < 0) {
-        syslog(LOG_ERR, "was not able to bind webserver");
-        exit(EXIT_FAILURE);
-    }
-    if(listen(websocket, 9) < 0) {
-        syslog(LOG_ERR, "not able to register listen");
-        exit(EXIT_FAILURE);
-    }
 
     /**
       * FORK OFF PROCESSES

@@ -1,7 +1,8 @@
 #include "globals.h"
 #include "isotpsend.h"
 
-extern int websocket, cansocket;
+extern int cansocket;
+int websocket;
 int conn;
 
 void isotpsend_sig(int sig) {
@@ -15,8 +16,30 @@ void isotpsend_sig(int sig) {
 
 void *isotpsend_run() {
     /* Declarations */
-    struct sockaddr_in webclient;
+    struct sockaddr_in webclient, webserv;
     socklen_t len;
+
+    /*
+       WEBSOCKET
+    */
+    websocket = socket(AF_INET, SOCK_STREAM, 0);
+    if(websocket < 0) {
+        syslog(LOG_ERR, "was not able to initiate websocket");
+        exit(EXIT_FAILURE);
+    }
+    /* bind server */
+    memset(&webserv, 0, sizeof(webserv));
+    webserv.sin_family = AF_INET;
+    webserv.sin_addr.s_addr = inet_addr("127.0.0.1");
+    webserv.sin_port = htons(25005);
+    if(bind(websocket, (struct sockaddr*)&webserv, sizeof(webserv)) < 0) {
+        syslog(LOG_ERR, "was not able to bind webserver");
+        exit(EXIT_FAILURE);
+    }
+    if(listen(websocket, 9) < 0) {
+        syslog(LOG_ERR, "not able to register listen");
+        exit(EXIT_FAILURE);
+    }
 
     /* add signal handler websock_sig */
     syslog(LOG_INFO, "isotpsend process started");
@@ -36,7 +59,6 @@ void *isotpsend_run() {
                 printf("Fehler in websock recv");
             webbuff[webbuffsize] = '\0';
             printf("msg: %s \n", webbuff);
-            printf("sending answer: OK\n");
             send(conn, "OK", 2, 0);
             close(conn);
         }
