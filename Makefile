@@ -11,7 +11,7 @@
 
 NAME = isotpd
 VERSION = 0.1
-CCFLAGS = -pedantic -ansi -Wall
+CCFLAGS = -pedantic -std=c99 -Wall
 CC = gcc $(CCFLAGS)
 LDFLAGS =
 
@@ -30,11 +30,4 @@ deploy: $(OBJ)
 
 clean:
 	rm $(OBJ) $(NAME)
-
-
-#old debug:
-#	gcc -o accessm -g main.c -g isotpsend.c -g isotprecv.c -g isotp.c  -pedantic -ansi -Wall -lpthread
-
-#old deploy:
-#	gcc -o accessm main.c isotpsend.c isotprecv.c isotp.c  -pedantic -ansi -Wall -lpthread
 

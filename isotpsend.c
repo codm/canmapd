@@ -22,8 +22,6 @@ void *isotpsend_run() {
     syslog(LOG_INFO, "isotpsend process started");
     signal(SIGTERM, isotpsend_sig);
 
-    /* initiate websock */
-
     while(1) {
         char webbuff[WEBSOCK_MAX_RECV];
         int webbuffsize;

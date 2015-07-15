@@ -43,7 +43,9 @@ int main(int argc, const char* argv[]) {
     struct ifreq ifr;
     int i = 0;
 
-    /* run code */
+    /*
+       run code
+    */
     for(i=0; i < argc; i++) {
         if(!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-v")) {
             verbose = 1;
@@ -56,8 +58,9 @@ int main(int argc, const char* argv[]) {
         }
     }
 
-    /* register signal handlers */
-
+    /*
+       register signal handlers
+    */
     if(run_daemon) {
         /* fork off parent */
         pid = fork();
@@ -72,11 +75,16 @@ int main(int argc, const char* argv[]) {
             exit(EXIT_SUCCESS);
         }
     }
-    /* set filemode creation mask to 0777 */
+
+    /*
+       set filemode creation mask to 0777
+    */
     umask(0);
 
-    /* open syslog for daemon */
-    openlog("accessm", 0, LOG_USER);
+    /*
+        open syslog for daemon
+    */
+    openlog(DAEMON_NAME, 0, LOG_USER);
 
     if(run_daemon) {
         sid = setsid();
@@ -94,7 +102,9 @@ int main(int argc, const char* argv[]) {
       *
       */
 
-    /* CANSOCKET */
+    /*
+       CANSOCKET
+    */
     cansocket = socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if(cansocket < 0) {
         syslog(LOG_ERR, "was not able to init cansock");
@@ -106,23 +116,26 @@ int main(int argc, const char* argv[]) {
     addr.can_ifindex = ifr.ifr_ifindex;
     bind(cansocket, (struct sockaddr *)&addr, sizeof(addr));
 
-    /* WEBSOCKET */
+    /*
+       WEBSOCKET
+    */
     websocket = socket(AF_INET, SOCK_STREAM, 0);
     if(websocket < 0) {
         syslog(LOG_ERR, "was not able to initiate websocket");
         exit(EXIT_FAILURE);
     }
+
     /* bind server */
     memset(&webserv, 0, sizeof(webserv));
     webserv.sin_family = AF_INET;
     webserv.sin_addr.s_addr = inet_addr("127.0.0.1");
     webserv.sin_port = htons(25005);
     if(bind(websocket, (struct sockaddr*)&webserv, sizeof(webserv)) < 0) {
-        syslog(LOG_ERR, "was not able to bind Webserver");
+        syslog(LOG_ERR, "was not able to bind webserver");
         exit(EXIT_FAILURE);
     }
     if(listen(websocket, 9) < 0) {
-        syslog(LOG_ERR, "not able to register Listen");
+        syslog(LOG_ERR, "not able to register listen");
         exit(EXIT_FAILURE);
     }
 
@@ -166,8 +179,10 @@ int main(int argc, const char* argv[]) {
 
     /* install sighandle for main process */
     signal(SIGTERM, sig_term);
-    syslog(LOG_INFO, "%s (%s) %s", DAEMON_NAME, DAEMON_VERSION, "started");
-    printf("PIDs: main: %d / isotprecv: %d / isotpsend: %d\n", pid, isotprecvpid, isotpsendpid);
+    syslog(LOG_INFO, "%s (%s) started", DAEMON_NAME, DAEMON_VERSION);
+    if(verbose > 0) {
+        printf("PIDs: main: %d / isotprecv: %d / isotpsend: %d\n", pid, isotprecvpid, isotpsendpid);
+    }
     while(1) {
         sleep(3);
     }

@@ -1,7 +1,6 @@
 *.swp
 *.out
 .gitignore
-accessm
 .*DS_Store
 isotpd
 *.o
