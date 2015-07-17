@@ -28,6 +28,7 @@ void print_helptext() {
     printf("Built %s %s\n", __DATE__, __TIME__);
     printf("(c) cod.m GmbH\n");
     printf("    --verbose (-v) Prints additional output to stdout\n");
+    printf("    --vcan0   (-V) sets can device to vcan0 instead of can0");
     printf("    --daemon  (-d) start as a daemon\n");
     printf("    --help    (-h) prints this helptext\n");
     exit(EXIT_SUCCESS);
@@ -51,6 +52,9 @@ int main(int argc, const char* argv[]) {
         }
         else if (!strcmp(argv[i], "--run_daemon") || !strcmp(argv[i], "-d")) {
             run_daemon = 1;
+        }
+        else if (!strcmp(argv[i], "--vcan0") || !strcmp(argv[i], "-V")) {
+            virtualcan = 1;
         }
         else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
             print_helptext();
@@ -109,7 +113,11 @@ int main(int argc, const char* argv[]) {
         syslog(LOG_ERR, "was not able to init cansock");
         exit(EXIT_FAILURE);
     }
-    strcpy(ifr.ifr_name, "can0" );
+    if(virtualcan) {
+        strcpy(ifr.ifr_name, "vcan0" );
+    } else {
+        strcpy(ifr.ifr_name, "can0" );
+    }
     ioctl(cansocket, SIOCGIFINDEX, &ifr);
     addr.can_family = AF_CAN;
     addr.can_ifindex = ifr.ifr_ifindex;

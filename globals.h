@@ -33,6 +33,7 @@ extern const char DAEMON_VERSION[];
 
 EXT uint8_t verbose; /* defines if program runs in verbose mode */
 EXT uint8_t run_daemon; /* defines if program runs in daemon mode */
+EXT uint8_t virtualcan; /* defines if virtual can vcan0 is used */
 
 #endif
 
