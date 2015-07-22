@@ -23,12 +23,11 @@ void sig_term(int sig) {
    print help text
    */
 void print_helptext() {
-    printf("%s daemon helptext. ", DAEMON_NAME);
-    printf("Daemon version %s. ", DAEMON_VERSION);
+    printf("%s Version %s\n", DAEMON_NAME, DAEMON_VERSION);
     printf("Built %s %s\n", __DATE__, __TIME__);
     printf("(c) cod.m GmbH\n");
     printf("    --verbose (-v) Prints additional output to stdout\n");
-    printf("    --vcan0   (-V) sets can device to vcan0 instead of can0");
+    printf("    --vcan0   (-V) sets can device to vcan0 instead of can0\n");
     printf("    --daemon  (-d) start as a daemon\n");
     printf("    --help    (-h) prints this helptext\n");
     exit(EXIT_SUCCESS);
