@@ -76,7 +76,6 @@ struct isotp_frame {
 
 
 void isotp_init();
-
 /**
   \brief computes can_frame into internal buffer
   This function computes a can_frame into its internal iso_tp

@@ -1,9 +1,39 @@
+#define _POSIX_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <syslog.h>
+#include <string.h>
+#include <signal.h>
+#include <pthread.h>
+#include <arpa/inet.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <linux/can.h>
+#include <linux/if.h>
+#include <netinet/in.h>
+
 #include "main.h"
-/*
-   init global vars
-*/
-pid_t pid, sid, isotprecvpid, isotpsendpid;
-int cansocket, websocket;
+#include "isotp.h"
+
+int process_connection(int socket);
+void sig_term(int sig);
+void print_helptext();
+int process_connection();
+void *can2tcp(void *arg);
+
+pid_t pid, sid, connection;
+
+struct connection_data {
+    int cansocket;
+    int websocket;
+    struct sockaddr_in webclient;
+    struct sockaddr_in webserver;
+};
+
+struct connection_data conn;
 
 void sig_term(int sig) {
     /* shutting down program properly */
@@ -12,6 +42,9 @@ void sig_term(int sig) {
     /* send sigterm to children */
     kill(0, SIGTERM);
 
+    close(conn.cansocket);
+    close(conn.websocket);
+
     /* closing log */
     syslog(LOG_INFO, "%s", "Shutdown complete");
     closelog();
@@ -19,15 +52,13 @@ void sig_term(int sig) {
     exit(EXIT_SUCCESS);
 }
 
-/*
-   print help text
-   */
 void print_helptext() {
     printf("%s Version %s\n", DAEMON_NAME, DAEMON_VERSION);
     printf("Built %s %s\n", __DATE__, __TIME__);
     printf("(c) cod.m GmbH\n");
     printf("    --verbose (-v) Prints additional output to stdout\n");
-    printf("    --vcan0   (-V) sets can device to vcan0 instead of can0\n");
+    printf("    --device  (-D) sets can device\n");
+    printf("    --port    (-p) Port where daemon listens\n");
     printf("    --daemon  (-d) start as a daemon\n");
     printf("    --help    (-h) prints this helptext\n");
     exit(EXIT_SUCCESS);
@@ -38,25 +69,33 @@ void print_helptext() {
 */
 int main(int argc, const char* argv[]) {
     /* init vars */
-    struct sockaddr_can addr;
-    struct ifreq ifr;
-    int i = 0;
+    struct sockaddr_in webclient, webserv;
+    socklen_t len;
+    int newsock, i;
 
     /*
        run code
     */
+    /* static init for CLP */
+    verbose = 0;
+    run_daemon = 0;
+    virtualcan = 0;
+    listenport = "25005";
+    device = "can0";
     for(i=0; i < argc; i++) {
         if(!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-v")) {
             verbose = 1;
         }
-        else if (!strcmp(argv[i], "--run_daemon") || !strcmp(argv[i], "-d")) {
+        else if (!strcmp(argv[i], "--daemon") || !strcmp(argv[i], "-d")) {
             run_daemon = 1;
         }
-        else if (!strcmp(argv[i], "--vcan0") || !strcmp(argv[i], "-V")) {
-            virtualcan = 1;
+        else if (!strcmp(argv[i], "--device") || !strcmp(argv[i], "-V")) {
+            i++;
+            device = argv[i];
         }
-        else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
-            print_helptext();
+        else if (!strcmp(argv[i], "--listen") || !strcmp(argv[i], "-l")) {
+            i++;
+            listenport = argv[i];
         }
     }
 
@@ -96,15 +135,77 @@ int main(int argc, const char* argv[]) {
         }
     }
 
-    /**
-      * Open Global Sockets
-      *
-      * Mainsocket = AF_INET Socket for interprocess communication
-      * CANSocket = AF_CAN Socket for CAN Bus Communication
-      *
-      */
-
     /*
+       WEBSOCKET
+    */
+    conn.websocket = socket(AF_INET, SOCK_STREAM, 0);
+    if(conn.websocket < 0) {
+        syslog(LOG_ERR, "was not able to initiate websocket");
+        exit(EXIT_FAILURE);
+    }
+    /* bind server */
+    memset(&webserv, 0, sizeof(webserv));
+    webserv.sin_family = AF_INET;
+    webserv.sin_addr.s_addr = inet_addr("127.0.0.1");
+    webserv.sin_port = htons(atoi(listenport));
+    if(bind(conn.websocket, (struct sockaddr*)&webserv, sizeof(webserv)) < 0) {
+        syslog(LOG_ERR, "was not able to bind webserver");
+        exit(EXIT_FAILURE);
+    }
+    if(listen(conn.websocket, 9) < 0) {
+        syslog(LOG_ERR, "not able to register listen");
+        exit(EXIT_FAILURE);
+    }
+
+    pid = getpid();
+
+    /* install sighandle for main process */
+    signal(SIGTERM, sig_term);
+    signal(SIGINT, sig_term);
+    syslog(LOG_INFO, "%s (%s) started", DAEMON_NAME, DAEMON_VERSION);
+    if(verbose) {
+        printf("%s (%s) started %d\n", DAEMON_NAME, DAEMON_VERSION, (int)pid);
+        printf("ip:port %s:%d\n", inet_ntoa(webserv.sin_addr), ntohs(webserv.sin_port));
+    }
+    len = sizeof(webclient);
+    while(1) {
+        newsock = accept(conn.websocket, (struct sockaddr*)&webclient, &len);
+        if(newsock > 0) {
+            connection = fork();
+            if(connection == 0) {
+                /* child */
+                pid = getpid();
+                if(verbose)
+                    printf("connection from %s forked into pid %d\n",
+                            inet_ntoa(webclient.sin_addr), (int)pid);
+                conn.webclient = webclient;
+                conn.webserver = webserv;
+                process_connection(newsock);
+                exit(EXIT_SUCCESS);
+            }
+            else if(connection < 0) {
+                /* error */
+                syslog(LOG_ERR, "was not able to create process for connection");
+            }
+            /* parent */
+            close(newsock);
+        }
+    }
+    syslog(LOG_INFO, "%s", "daemon successfully shut down");
+    return 0;
+}
+
+int process_connection(int websock) {
+    int cansocket;
+    struct sockaddr_can addr;
+    struct ifreq ifr;
+    pthread_t can2tcpthread;
+    char webbuff[WEBSOCK_MAX_RECV];
+    int webbuffsize, running;
+
+    /* open CAN Socket */
+    /*
+
        CANSOCKET
     */
     cansocket = socket(PF_CAN, SOCK_RAW, CAN_RAW);
@@ -112,65 +213,73 @@ int main(int argc, const char* argv[]) {
         syslog(LOG_ERR, "was not able to init cansock");
         exit(EXIT_FAILURE);
     }
-    if(virtualcan) {
-        strcpy(ifr.ifr_name, "vcan0" );
-    } else {
-        strcpy(ifr.ifr_name, "can0" );
-    }
+    strcpy(ifr.ifr_name, device);
     ioctl(cansocket, SIOCGIFINDEX, &ifr);
     addr.can_family = AF_CAN;
     addr.can_ifindex = ifr.ifr_ifindex;
     bind(cansocket, (struct sockaddr *)&addr, sizeof(addr));
 
-
-
-    /**
-      * FORK OFF PROCESSES
-      *
-      * CANPID = CANSocket Polling Process
-      * WEBPID = WebSocket Polling Process
-      * EVALPID = Evaluation and Sending Process
-      *
-      */
-
-    isotprecvpid = fork();
-    if(isotprecvpid == 0) {
-        /* child */
-        close(websocket);
-        isotprecv_run();
-        exit(EXIT_SUCCESS);
+    conn.cansocket = cansocket;
+    conn.websocket = websock;
+    /* open thread for can_send */
+    if(0 != pthread_create(&can2tcpthread, NULL, can2tcp, &conn)) {
+        perror("thread");
+        return 0;
     }
-    else if(isotprecvpid < 0) {
-        /* error */
-        syslog(LOG_ERR, "was not able to create canpid");
-    }
-
-    isotpsendpid = fork();
-    if(isotpsendpid == 0) {
-        /* child */
-        isotpsend_run();
-        exit(EXIT_SUCCESS);
-    }
-    else if(isotpsendpid < 0) {
-        /* error */
-        syslog(LOG_ERR, "was not able to create webpid");
-        exit(EXIT_FAILURE);
+    running = 1;
+    write(conn.websocket, "> hi\n", 6);
+    while(running) {
+        if((webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV,0)) < 0)
+            printf("Fehler in websock recv");
+        webbuff[webbuffsize] = '\0';
+        if(strcmp("<exit>\n", webbuff) == 0) {
+            running = 0;
+        }
+        /* if(isotp_str2fr(webbuff, &sendframe) > 0) {
+            printf("msg: %s \n", webbuff);
+            isotp_send_frame(&cansocket, &sendframe);
+        }; */
+        send(conn.websocket, webbuff, strlen(webbuff), 0);
     }
 
-    /**
-      * Write Syslog and go into main loop
-      */
-    pid = getpid();
-
-    /* install sighandle for main process */
-    signal(SIGTERM, sig_term);
-    syslog(LOG_INFO, "%s (%s) started", DAEMON_NAME, DAEMON_VERSION);
-    if(verbose > 0) {
-        printf("PIDs: main: %d / isotprecv: %d / isotpsend: %d\n", pid, isotprecvpid, isotpsendpid);
-    }
-    while(1) {
-        sleep(3);
-    }
-    syslog(LOG_INFO, "%s", "daemon successfully shut down");
-    return 0;
+    /* close */
+    close(conn.cansocket);
+    close(conn.websocket);
+    return 1;
 }
+
+void *can2tcp(void *arg) {
+    int nbytes;
+    struct connection_data* conn;
+    char sock_send[9000];
+    struct can_frame frame;
+    struct isotp_frame isoframe;
+
+    isotp_init();
+    /* empty */
+    conn = (struct connection_data*)arg;
+    while(1) {
+        nbytes = read(conn->cansocket, &frame, sizeof(struct can_frame));
+        if(nbytes < 0) {
+            /* nothing */
+        }
+        else if (nbytes == sizeof(struct can_frame)) {
+            int status;
+            status = isotp_compute_frame(&(conn->cansocket), &frame);
+            if(status == ISOTP_COMPRET_COMPLETE) {
+                if(isotp_get_frame(&isoframe)) {
+                    isotp_fr2str(sock_send, &isoframe);
+                    /* printf("%s\n", printarray); */
+                    send(conn->websocket, sock_send, strlen(sock_send), 0);
+                }
+            }
+            else if(status == ISOTP_COMPRET_ERROR) {
+                printf("ERROR id: %X l: %d data: %.*x \n",
+                    (frame.can_id & CAN_SFF_MASK), frame.can_dlc,
+                    8, frame.data[0]);
+                /* ISO-TP msg still in transmission */
+            }
+        }
+    }
+}
+

@@ -13,10 +13,9 @@ NAME = isotpd
 VERSION = 0.1
 CCFLAGS = -pedantic -std=c99 -Wall
 CC = gcc $(CCFLAGS)
-LDFLAGS =
+LDFLAGS = -lpthread
 
-OBJ = main.o isotpsend.o isotprecv.o isotp.o
-
+OBJ = main.o isotp.o
 all: deploy
 
 debug: CCFLAGS += -DDEBUG -g

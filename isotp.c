@@ -330,6 +330,7 @@ int isotp_fr2str(char *dst, struct isotp_frame *src) {
         n = sprintf(buffer, "%02x", src->data[i]);
         buffer = buffer+n;
     }
+    *buffer = '\n';
     return 1;
 }
 
