@@ -33,11 +33,6 @@ THE SOFTWARE.
 #ifndef _ISOTP_H
 #define _ISOTP_H
 
-#include "globals.h"
-#include <linux/can.h>
-#include <linux/if.h>
-#include <sys/ioctl.h>
-
 /*
    Defines
 */

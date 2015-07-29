@@ -30,9 +30,18 @@
   @date    25.6.2015
   */
 
-#include "isotp.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <sys/time.h>
 #include <sys/select.h>
+#include <sys/types.h>
+#include <linux/can.h>
+#include <netinet/in.h>
+#include <sys/ioctl.h>
+#include <string.h>
+
+#include "isotp.h"
 
 /**
   ISOTP-Buffer
