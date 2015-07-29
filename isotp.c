@@ -31,6 +31,8 @@
   */
 
 #include "isotp.h"
+#include <sys/time.h>
+#include <sys/select.h>
 
 /**
   ISOTP-Buffer
@@ -190,6 +192,58 @@ int isotp_get_frame(struct isotp_frame *dst) {
     }
 }
 
+int isotp_send_frame(int *socket, struct isotp_frame *frame) {
+
+    struct can_frame sframe;
+    unsigned int i, r, lencnt;
+    uint8_t *datainc;
+    fd_set rfds;
+    struct timeval tv;
+
+    /* zero rfds and 10000 usec wait */
+    FD_ZERO(&rfds);
+    FD_SET(*socket, &rfds);
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+
+    sframe.can_id = frame->rec;
+    datainc = frame->data;
+    lencnt = frame->dl;
+    /* single frame */
+    if(frame->dl <= 6) {
+        sframe.can_dlc = frame->dl + 2;
+        sframe.data[0] = frame->sender;
+        sframe.data[1] = (ISOTP_STATUS_SF << 4) | frame->dl;
+        for(i = 0; i < frame->dl; i++)
+            sframe.data[i + 2] = *datainc++;
+        r = write(*socket, &sframe, sizeof(struct can_frame));
+        if(r > 0)
+            return 1;
+        else
+            return 0;
+    }
+
+    /* build first frame */
+    sframe.can_dlc = 8;
+    sframe.data[0] = frame->sender;
+    sframe.data[1] = (ISOTP_STATUS_FF << 4) | ((frame->dl & 0x0F00) >> 8);
+    sframe.data[2] = frame->dl & 0x00FF;
+    for(i = 3; i < 8; i++) {
+        sframe.data[i] = *datainc++;
+        lencnt--;
+    }
+
+    r = write(*socket, &sframe, sizeof(struct can_frame));
+    /* wait for FC with timeout */
+    r = select(*socket + 1, &rfds, NULL, NULL, &tv);
+    if(r <= 0) {
+        perror("select()");
+    }
+
+    /* something went wrong */
+    return 0;
+}
+
 int _buff_get_next_free(isotpbuff_t **dst) {
     int i;
     for(i = 0; i < ISOTP_BUFFER_SIZE; i++) {
@@ -284,7 +338,10 @@ int isotp_str2fr(char *src, struct isotp_frame *dst) {
     uint8_t *bufdst;
     char buffer[2*4096]; /* 4096 uint8_t a 2 characters */
     char *bufbuff = buffer;
-    sscanf(src, "%02x;%02x;%04u;%s", &sender, &rec, &dl, buffer);
+    /* TODO: Secure this input via regex */
+    if(sscanf(src, "%02x;%02x;%04u;%s", &sender, &rec, &dl, buffer) < 1) {
+        return 0;
+    };
     dst->sender = (uint8_t)sender;
     dst->rec = (uint8_t)rec;
     dst->dl = (uint8_t)dl;

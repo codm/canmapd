@@ -1,5 +1,6 @@
 #include "globals.h"
 #include "isotpsend.h"
+#include "isotp.h"
 
 extern int cansocket;
 int websocket;
@@ -17,6 +18,7 @@ void isotpsend_sig(int sig) {
 void *isotpsend_run() {
     /* Declarations */
     struct sockaddr_in webclient, webserv;
+    struct isotp_frame sendframe;
     socklen_t len;
 
     /*
@@ -58,8 +60,10 @@ void *isotpsend_run() {
             if((webbuffsize = recv(conn, webbuff, WEBSOCK_MAX_RECV,0)) < 0)
                 printf("Fehler in websock recv");
             webbuff[webbuffsize] = '\0';
-            printf("msg: %s \n", webbuff);
-            send(conn, "OK", 2, 0);
+            if(isotp_str2fr(webbuff, &sendframe) > 0) {
+                printf("msg: %s \n", webbuff);
+                isotp_send_frame(&cansocket, &sendframe);
+            };
             close(conn);
         }
     }
