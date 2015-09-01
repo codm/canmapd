@@ -99,7 +99,7 @@ int main(int argc, const char* argv[]) {
             i++;
             device = argv[i];
         }
-        else if (!strcmp(argv[i], "--listen") || !strcmp(argv[i], "-l")) {
+        else if (!strcmp(argv[i], "--port") || !strcmp(argv[i], "-p")) {
             i++;
             listenport = argv[i];
         }
