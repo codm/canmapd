@@ -14,4 +14,3 @@ const char* listenport; /* port where daemon listen for messages TCP->CAN */
 const char* device; /* CAN device */
 
 #endif
-

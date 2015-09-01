@@ -16,7 +16,7 @@
 #include <netinet/in.h>
 
 #include "main.h"
-#include "isotp.h"
+#include "canblocks.h"
 
 int process_connection(int socket);
 void sig_term(int sig);
@@ -35,8 +35,8 @@ struct connection_data {
 
 struct connection_data conn;
 
-const char DAEMON_NAME[] = "isotpd";
-const char DAEMON_VERSION[] = "0.1";
+const char DAEMON_NAME[] = "camblocksd";
+const char DAEMON_VERSION[] = "0.2";
 
 void sig_term(int sig) {
     /* shutting down program properly */
@@ -215,7 +215,7 @@ int process_connection(int websock) {
     int cansocket;
     struct sockaddr_can addr;
     struct ifreq ifr;
-    struct isotp_frame sendframe;
+    struct canblocks_frame sendframe;
     pthread_t can2tcpthread;
     char webbuff[WEBSOCK_MAX_RECV];
     int webbuffsize, running;
@@ -252,9 +252,9 @@ int process_connection(int websock) {
         if(strcmp("<exit>\n", webbuff) == 0) {
             running = 0;
         }
-        if(isotp_str2fr(webbuff, &sendframe) > 0) {
+        if(canblocks_str2fr(webbuff, &sendframe) > 0) {
             /* printf("msg: %s \n", webbuff); */
-            isotp_send_frame(&cansocket, &sendframe);
+            canblocks_send_frame(&cansocket, &sendframe);
         };
         /* send(conn.websocket, webbuff, strlen(webbuff), 0); */
     }
@@ -270,9 +270,9 @@ void *can2tcp(void *arg) {
     struct connection_data* conn;
     char sock_send[9000];
     struct can_frame frame;
-    struct isotp_frame isoframe;
+    struct canblocks_frame isoframe;
 
-    isotp_init();
+    canblocks_init();
     /* empty */
     conn = (struct connection_data*)arg;
     while(1) {
@@ -282,19 +282,19 @@ void *can2tcp(void *arg) {
         }
         else if (nbytes == sizeof(struct can_frame)) {
             int status;
-            status = isotp_compute_frame(&(conn->cansocket), &frame);
-            if(status == ISOTP_COMPRET_COMPLETE) {
-                if(isotp_get_frame(&isoframe)) {
-                    isotp_fr2str(sock_send, &isoframe);
+            status = canblocks_compute_frame(&(conn->cansocket), &frame);
+            if(status == CANBLOCKS_COMPRET_COMPLETE) {
+                if(canblocks_get_frame(&isoframe)) {
+                    canblocks_fr2str(sock_send, &isoframe);
                     /* printf("%s\n", printarray); */
                     send(conn->websocket, sock_send, strlen(sock_send), 0);
                 }
             }
-            else if(status == ISOTP_COMPRET_ERROR) {
+            else if(status == CANBLOCKS_COMPRET_ERROR) {
                 printf("ERROR id: %X l: %d data: %.*x \n",
                     (frame.can_id & CAN_SFF_MASK), frame.can_dlc,
                     8, frame.data[0]);
-                /* ISO-TP msg still in transmission */
+                /* msg still in transmission */
             }
         }
     }

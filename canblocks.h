@@ -1,3 +1,5 @@
+
+
 /**
 The MIT License (MIT)
 
@@ -22,44 +24,44 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 
-   \brief ISO-TP library for SocketCAN
-   This is a ISO-TP extended adress implementation for SocketCAN.
+   \brief CANBLOCKS library for SocketCAN
+   This is a CANBLOCKS extended adress implementation for SocketCAN.
 
    @author  Tobias Schmitt
    @email   tobias.schmitt@codm.de
    @date    24.6.2015
 */
 
-#ifndef _ISOTP_H
-#define _ISOTP_H
+#ifndef _CANBLOCKS_H
+#define _CANBLOCKS_H
 
 /*
    Defines
 */
 
-#define ISOTP_BUFFER_SIZE        20      /* Buffer size can be chosen freely */
-#define ISOTP_BLOCKSIZE          4       /* Maximum 16 Blocks  */
-#define ISOTP_MIN_SEP_TIME       10      /* Min 10ms Seperation time  */
-#define ISOTP_BROADCAST          0xFF    /* Broadcast Adress */
+#define CANBLOCKS_BUFFER_SIZE        20      /* Buffer size can be chosen freely */
+#define CANBLOCKS_BLOCKSIZE          4       /* Maximum 16 Blocks  */
+#define CANBLOCKS_MIN_SEP_TIME       10      /* Min 10ms Seperation time  */
+#define CANBLOCKS_BROADCAST          0xFF    /* Broadcast Adress */
 
-#define ISOTP_STATUS_SF          0x00    /* Single Frame */
-#define ISOTP_STATUS_FF          0x01    /* First Frame */
-#define ISOTP_STATUS_CF          0x02    /* Consecutive Frames */
-#define ISOTP_STATUS_FC          0x03    /* Flow Control Frame */
+#define CANBLOCKS_STATUS_SF          0x00    /* Single Frame */
+#define CANBLOCKS_STATUS_FF          0x01    /* First Frame */
+#define CANBLOCKS_STATUS_CF          0x02    /* Consecutive Frames */
+#define CANBLOCKS_STATUS_FC          0x03    /* Flow Control Frame */
 
-#define ISOTP_COMPRET_COMPLETE   1       /* Transmission Complete */
-#define ISOTP_COMPRET_TRANS      0       /* Transmission pending... */
-#define ISOTP_COMPRET_ERROR      -1      /* No ISO-TP Frame or no fre buffer */
+#define CANBLOCKS_COMPRET_COMPLETE   1       /* Transmission Complete */
+#define CANBLOCKS_COMPRET_TRANS      0       /* Transmission pending... */
+#define CANBLOCKS_COMPRET_ERROR      -1      /* No ISO-TP Frame or no fre buffer */
 
-#define ISOTP_FLOWSTAT_CLEAR     0
-#define ISOTP_FLOWSTAT_WAIT      1
-#define ISOTP_FLOWSTAT_OVERFLOW  2
+#define CANBLOCKS_FLOWSTAT_CLEAR     0
+#define CANBLOCKS_FLOWSTAT_WAIT      1
+#define CANBLOCKS_FLOWSTAT_OVERFLOW  2
 
 /**
   \brief Abstract struct of a ISO-TP frame
   this is a typical ISO-TP frame for extended CAN Addressing
 */
-struct isotp_frame {
+struct canblocks_frame {
     uint8_t sender; /**< Sender-ID of ISO-TP Frame */
     uint8_t rec; /**< Receiver-ID of ISO-TP Frame */
     uint16_t dl; /**< Length of ISO-TP Frame */
@@ -67,11 +69,11 @@ struct isotp_frame {
 };
 
 /**
-  \brief !MANDATORY! init the needed isotp data structs
+  \brief !MANDATORY! init the needed canblocks data structs
 */
 
 
-void isotp_init();
+void canblocks_init();
 /**
   \brief computes can_frame into internal buffer
   This function computes a can_frame into its internal iso_tp
@@ -83,33 +85,33 @@ void isotp_init();
   @param[0] can_frame *frame can frame to be processed
 
   @return < 0 for error, 0 if there are still messages to come
-            1 if the isotp_frame is finished and ready to get
+            1 if the canblocks_frame is finished and ready to get
 */
-int isotp_compute_frame(int *socket, struct can_frame *frame);
+int canblocks_compute_frame(int *socket, struct can_frame *frame);
 
 /**
-  \brief sends an isotp frame over socket
+  \brief sends an canblocks frame over socket
 
   @param[0] int *socket        pointer to an open CAN_SOCKET
-  @param[0] isotp_frame *frame frame to be sent
+  @param[0] canblocks_frame *frame frame to be sent
 
   @return EXIT_SUCCESS for success
           EXIT_FAILURE for failure
 
 */
-int isotp_send_frame(int *socket, struct isotp_frame *frame);
+int canblocks_send_frame(int *socket, struct canblocks_frame *frame);
 
 /**
   \brief gets a finished ISO-TP frame for further computation
 
-  @param[0] isotp_frame **dst pointer to a frame which should be written
+  @param[0] canblocks_frame **dst pointer to a frame which should be written
 
   @return EXIT_SUCCESS for success
           EXIT_FAILURE for failure
 */
-int isotp_get_frame(struct isotp_frame *dst);
+int canblocks_get_frame(struct canblocks_frame *dst);
 
-int isotp_fr2str(char *dst, struct isotp_frame *src);
-int isotp_str2fr(char *src, struct isotp_frame *dst);
+int canblocks_fr2str(char *dst, struct canblocks_frame *src);
+int canblocks_str2fr(char *src, struct canblocks_frame *dst);
 #endif
 
