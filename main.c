@@ -240,7 +240,7 @@ int process_connection(int websock) {
     conn.websocket = websock;
     /* open thread for can_send */
     if(0 != pthread_create(&can2tcpthread, NULL, can2tcp, &conn)) {
-        perror("thread");
+        perror("canthread");
         return 0;
     }
     running = 1;
@@ -253,10 +253,10 @@ int process_connection(int websock) {
             running = 0;
         }
         if(isotp_str2fr(webbuff, &sendframe) > 0) {
-            printf("msg: %s \n", webbuff);
+            /* printf("msg: %s \n", webbuff); */
             isotp_send_frame(&cansocket, &sendframe);
         };
-        send(conn.websocket, webbuff, strlen(webbuff), 0);
+        /* send(conn.websocket, webbuff, strlen(webbuff), 0); */
     }
 
     /* close */

@@ -208,8 +208,8 @@ int isotp_get_frame(struct isotp_frame *dst) {
 
 int isotp_send_frame(int *socket, struct isotp_frame *frame) {
 
-    struct can_frame sframe;
-    unsigned int i, r, lencnt;
+    struct can_frame sframe, recvfc;
+    unsigned int i, r, lencnt, fc_flowstat, fc_blocksize, fc_minseptime;
     uint8_t *datainc;
     fd_set rfds;
     struct timeval tv;
@@ -247,13 +247,26 @@ int isotp_send_frame(int *socket, struct isotp_frame *frame) {
         lencnt--;
     }
 
+    /* set sock option for timeout */
+    setsockopt(*socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,sizeof(struct timeval));
+
     r = write(*socket, &sframe, sizeof(struct can_frame));
     /* wait for FC with timeout */
-    r = select(*socket + 1, &rfds, NULL, NULL, &tv);
-    if(r <= 0) {
-        perror("select()");
+    printf("send start, wait for flowcontrol...\n");
+    if(recv(*socket, &recvfc, sizeof(struct can_frame), 0)) {
+        printf("%x->%x\n", sframe.can_id, sframe.data[0]);
+        printf("%x->%x\n", recvfc.can_id, recvfc.data[0]);
+        if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
+                ((recvfc.data[1] >> 4) == ISOTP_STATUS_FC)) {
+            fc_flowstat = recvfc.data[1] & 0x0F;
+            fc_blocksize = recvfc.data[2];
+            fc_minseptime = recvfc.data[3];
+            printf("got fc from %x: BS %x SEPTIME %x FLOWSTAT %x\n", recvfc.can_id, 
+                    fc_blocksize, fc_minseptime, fc_flowstat);
+        }
     }
 
+    setsockopt(*socket, SOL_SOCKET, SO_RCVTIMEO, NULL,sizeof(struct timeval));
     /* something went wrong */
     return 0;
 }
