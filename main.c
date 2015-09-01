@@ -35,6 +35,9 @@ struct connection_data {
 
 struct connection_data conn;
 
+const char DAEMON_NAME[] = "isotpd";
+const char DAEMON_VERSION[] = "0.1";
+
 void sig_term(int sig) {
     /* shutting down program properly */
     syslog(LOG_INFO, "%s", "Sigterm received - shutting down");
@@ -60,6 +63,7 @@ void print_helptext() {
     printf("    --device  (-D) sets can device\n");
     printf("    --port    (-p) Port where daemon listens\n");
     printf("    --daemon  (-d) start as a daemon\n");
+    printf("    --filter  (-h) set filter for incoming messages (default 0)\n");
     printf("    --help    (-h) prints this helptext\n");
     exit(EXIT_SUCCESS);
 }
@@ -80,8 +84,10 @@ int main(int argc, const char* argv[]) {
     verbose = 0;
     run_daemon = 0;
     virtualcan = 0;
+    rec_filter = 0;
     listenport = "25005";
     device = "can0";
+    rec_filter = 0x00;
     for(i=0; i < argc; i++) {
         if(!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-v")) {
             verbose = 1;
@@ -96,6 +102,15 @@ int main(int argc, const char* argv[]) {
         else if (!strcmp(argv[i], "--listen") || !strcmp(argv[i], "-l")) {
             i++;
             listenport = argv[i];
+        }
+        else if (!strcmp(argv[i], "--filter") || !strcmp(argv[i], "-f")) {
+            i++;
+            rec_filter = (uint8_t)strtol(argv[i], NULL, 10);
+        }
+        else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
+            i++;
+            print_helptext();
+            return 0;
         }
     }
 
@@ -166,6 +181,7 @@ int main(int argc, const char* argv[]) {
     if(verbose) {
         printf("%s (%s) started %d\n", DAEMON_NAME, DAEMON_VERSION, (int)pid);
         printf("ip:port %s:%d\n", inet_ntoa(webserv.sin_addr), ntohs(webserv.sin_port));
+        printf("receive: %d\n", rec_filter);
     }
     len = sizeof(webclient);
     while(1) {
@@ -199,6 +215,7 @@ int process_connection(int websock) {
     int cansocket;
     struct sockaddr_can addr;
     struct ifreq ifr;
+    struct isotp_frame sendframe;
     pthread_t can2tcpthread;
     char webbuff[WEBSOCK_MAX_RECV];
     int webbuffsize, running;
@@ -235,10 +252,10 @@ int process_connection(int websock) {
         if(strcmp("<exit>\n", webbuff) == 0) {
             running = 0;
         }
-        /* if(isotp_str2fr(webbuff, &sendframe) > 0) {
+        if(isotp_str2fr(webbuff, &sendframe) > 0) {
             printf("msg: %s \n", webbuff);
             isotp_send_frame(&cansocket, &sendframe);
-        }; */
+        };
         send(conn.websocket, webbuff, strlen(webbuff), 0);
     }
 

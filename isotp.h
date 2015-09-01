@@ -40,6 +40,7 @@ THE SOFTWARE.
 #define ISOTP_BUFFER_SIZE        20      /* Buffer size can be chosen freely */
 #define ISOTP_BLOCKSIZE          4       /* Maximum 16 Blocks  */
 #define ISOTP_MIN_SEP_TIME       10      /* Min 10ms Seperation time  */
+#define ISOTP_BROADCAST          0xFF    /* Broadcast Adress */
 
 #define ISOTP_STATUS_SF          0x00    /* Single Frame */
 #define ISOTP_STATUS_FF          0x01    /* First Frame */

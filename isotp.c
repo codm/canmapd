@@ -42,6 +42,7 @@
 #include <string.h>
 
 #include "isotp.h"
+#include "main.h"
 
 /**
   ISOTP-Buffer
@@ -97,6 +98,10 @@ int isotp_compute_frame(int *socket, struct can_frame *frame) {
     flowcontrol.data[1] = ((ISOTP_STATUS_FC << 4)|ISOTP_FLOWSTAT_CLEAR);
     flowcontrol.data[2] = ISOTP_BLOCKSIZE;
     flowcontrol.data[3] = ISOTP_MIN_SEP_TIME;
+
+    if(!((receiver == rec_filter) || (receiver == ISOTP_BROADCAST))) {
+        return ISOTP_COMPRET_ERROR;
+    }
 
     switch(status) {
         case ISOTP_STATUS_SF:
@@ -365,5 +370,3 @@ int isotp_str2fr(char *src, struct isotp_frame *dst) {
     }
     return 1;
 }
-
-
