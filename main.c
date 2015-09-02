@@ -1,13 +1,14 @@
-#define _POSIX_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 #include <syslog.h>
 #include <string.h>
 #include <signal.h>
 #include <pthread.h>
 #include <arpa/inet.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -31,6 +32,7 @@ struct connection_data {
     int websocket;
     struct sockaddr_in webclient;
     struct sockaddr_in webserver;
+    pthread_mutex_t cansocket_mutex;
 };
 
 struct connection_data conn;
@@ -238,6 +240,9 @@ int process_connection(int websock) {
 
     conn.cansocket = cansocket;
     conn.websocket = websock;
+
+    /* initialize websocket mutex */
+    pthread_mutex_init(&(conn.cansocket_mutex), NULL);
     /* open thread for can_send */
     if(0 != pthread_create(&can2tcpthread, NULL, can2tcp, &conn)) {
         perror("canthread");
@@ -254,7 +259,13 @@ int process_connection(int websock) {
         }
         if(canblocks_str2fr(webbuff, &sendframe) > 0) {
             /* printf("msg: %s \n", webbuff); */
+
+            /* block websocket */
+            pthread_mutex_lock(&conn.cansocket_mutex);
+            /* send frame */
             canblocks_send_frame(&cansocket, &sendframe);
+            /* unblock websocket */
+            pthread_mutex_unlock(&conn.cansocket_mutex);
         };
         /* send(conn.websocket, webbuff, strlen(webbuff), 0); */
     }
@@ -271,31 +282,40 @@ void *can2tcp(void *arg) {
     char sock_send[9000];
     struct can_frame frame;
     struct canblocks_frame isoframe;
+    struct timespec waittime;
+    waittime.tv_sec = 0;
+    waittime.tv_nsec = 10000000L;
 
     canblocks_init();
     /* empty */
     conn = (struct connection_data*)arg;
     while(1) {
-        nbytes = read(conn->cansocket, &frame, sizeof(struct can_frame));
-        if(nbytes < 0) {
-            /* nothing */
-        }
-        else if (nbytes == sizeof(struct can_frame)) {
-            int status;
-            status = canblocks_compute_frame(&(conn->cansocket), &frame);
-            if(status == CANBLOCKS_COMPRET_COMPLETE) {
-                if(canblocks_get_frame(&isoframe)) {
-                    canblocks_fr2str(sock_send, &isoframe);
-                    /* printf("%s\n", printarray); */
-                    send(conn->websocket, sock_send, strlen(sock_send), 0);
+        nanosleep(&waittime, NULL);
+
+        /* if websocket is free */
+        if(pthread_mutex_trylock(&conn->cansocket_mutex) != EBUSY) {
+            nbytes = recv(conn->cansocket, &frame, sizeof(struct can_frame), MSG_DONTWAIT);
+            if(nbytes < 0) {
+                /* nothing */
+            }
+            else if (nbytes == sizeof(struct can_frame)) {
+                int status;
+                status = canblocks_compute_frame(&(conn->cansocket), &frame);
+                if(status == CANBLOCKS_COMPRET_COMPLETE) {
+                    if(canblocks_get_frame(&isoframe)) {
+                        canblocks_fr2str(sock_send, &isoframe);
+                        /* printf("%s\n", printarray); */
+                        send(conn->websocket, sock_send, strlen(sock_send), 0);
+                    }
+                }
+                else if(status == CANBLOCKS_COMPRET_ERROR) {
+                    printf("ERROR id: %X l: %d data: %.*x \n",
+                        (frame.can_id & CAN_SFF_MASK), frame.can_dlc,
+                        8, frame.data[0]);
+                    /* msg still in transmission */
                 }
             }
-            else if(status == CANBLOCKS_COMPRET_ERROR) {
-                printf("ERROR id: %X l: %d data: %.*x \n",
-                    (frame.can_id & CAN_SFF_MASK), frame.can_dlc,
-                    8, frame.data[0]);
-                /* msg still in transmission */
-            }
+            pthread_mutex_unlock(&conn->cansocket_mutex);
         }
     }
 }
