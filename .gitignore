@@ -6,3 +6,4 @@
 isotpd
 canblocksd
 *.o
+.fuse*
