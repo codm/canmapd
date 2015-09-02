@@ -35,7 +35,7 @@ struct connection_data {
 
 struct connection_data conn;
 
-const char DAEMON_NAME[] = "camblocksd";
+const char DAEMON_NAME[] = "canblocksd";
 const char DAEMON_VERSION[] = "0.2";
 
 void sig_term(int sig) {
