@@ -4,4 +4,5 @@
 .gitignore
 .*DS_Store
 isotpd
+canblocksd
 *.o
