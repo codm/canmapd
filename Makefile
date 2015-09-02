@@ -10,8 +10,8 @@
 ##
 
 NAME = canblocksd
-VERSION = 0.1
-CCFLAGS = -pedantic -std=c99 -Wall
+VERSION = 0.2
+CCFLAGS = -Wall
 CC = gcc $(CCFLAGS)
 LDFLAGS = -lpthread
 
@@ -29,4 +29,3 @@ deploy: $(OBJ)
 
 clean:
 	rm $(OBJ) $(NAME)
-
