@@ -310,9 +310,6 @@ void *can2tcp(void *arg) {
                     }
                 }
                 else if(status == CANBLOCKS_COMPRET_ERROR) {
-                    printf("ERROR id: %X l: %d data: %.*x \n",
-                        (frame.can_id & CAN_SFF_MASK), frame.can_dlc,
-                        8, frame.data[0]);
                     /* msg still in transmission */
                 }
             }

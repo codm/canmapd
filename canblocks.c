@@ -210,7 +210,7 @@ int canblocks_get_frame(struct canblocks_frame *dst) {
 int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
 
     struct can_frame sframe, recvfc;
-    unsigned int i, j, r, lencnt, fc_flowstat, fc_blocksize, fc_minseptime;
+    unsigned int i, j, r, lencnt, fc_blocksize, fc_minseptime;
     uint8_t *datainc;
     fd_set rfds;
     struct timeval tv;
@@ -258,7 +258,6 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
     if(recv(*socket, &recvfc, sizeof(struct can_frame), 0)) {
         if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
                 ((recvfc.data[1] >> 4) == CANBLOCKS_STATUS_FC)) {
-            fc_flowstat = recvfc.data[1] & 0x0F;
             fc_blocksize = recvfc.data[2];
             fc_minseptime = recvfc.data[3];
             wait.tv_nsec = fc_minseptime * 1000000; /* msec to nsec */
@@ -287,7 +286,6 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
                 if(recv(*socket, &recvfc, sizeof(struct can_frame), 0)) {
                     if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
                             ((recvfc.data[1] >> 4) == CANBLOCKS_STATUS_FC)) {
-                        fc_flowstat = recvfc.data[1] & 0x0F;
                         fc_blocksize = recvfc.data[2];
                         fc_minseptime = recvfc.data[3];
                         wait.tv_nsec = fc_minseptime * 1000000; /* msec to nsec */
