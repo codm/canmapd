@@ -151,7 +151,7 @@ int canblocks_compute_frame(int *socket, struct can_frame *frame) {
                 return CANBLOCKS_COMPRET_ERROR;
             }
         case CANBLOCKS_STATUS_CF:
-            /* if first frame */
+            /* if consecutive frame */
             if(_buff_get_pending(&dst, sender)) {
                 /* copy frame to canframes at right point */
                 int sequenceNr = frame->data[1] & 0x0F;
@@ -268,8 +268,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
         return 0;
     }
 
-    int cf_count = 1;
-    int block_count = 0;
+    int block_count = 1;
 
     while(lencnt > 0) {
         if(lencnt > 6) {
@@ -277,16 +276,14 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
             sframe.can_id = frame->rec;
             sframe.can_dlc = 8;
             sframe.data[0] = frame->sender;
-            sframe.data[1] = (CANBLOCKS_STATUS_CF << 4) | cf_count;
+            sframe.data[1] = (CANBLOCKS_STATUS_CF << 4) | block_count;
             for(i = 2; i < 8; i++) {
                 sframe.data[i] = *datainc++;
                 lencnt--;
             } 
             write(*socket, &sframe, sizeof(struct can_frame));
-            cf_count = (cf_count + 1) % 16;
-            block_count++;
-            if(block_count >= fc_blocksize) {
-                block_count = 0;
+            block_count = (block_count + 1) % fc_blocksize;
+            if(block_count == fc_blocksize - 1) {
                 if(recv(*socket, &recvfc, sizeof(struct can_frame), 0)) {
                     if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
                             ((recvfc.data[1] >> 4) == CANBLOCKS_STATUS_FC)) {
@@ -307,7 +304,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
             sframe.can_id = frame->rec;
             sframe.can_dlc = j;
             sframe.data[0] = frame->sender;
-            sframe.data[1] = (CANBLOCKS_STATUS_CF << 4) | cf_count;
+            sframe.data[1] = (CANBLOCKS_STATUS_CF << 4) | block_count;
             for(i = 2; i < j; i++) {
                 sframe.data[i] = *datainc++;
                 lencnt--;
@@ -434,4 +431,11 @@ int canblocks_str2fr(char *src, struct canblocks_frame *dst) {
         bufbuff = bufbuff + 2; /* iterate over 2 chars in string */
     }
     return 1;
+}
+
+void canblocks_reset_frame(struct canblocks_frame *dst) {
+    free(dst->data);
+    dst->sender = 0;
+    dst->rec = 0;
+    dst->dl = 0;
 }

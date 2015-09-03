@@ -306,6 +306,7 @@ void *can2tcp(void *arg) {
                         canblocks_fr2str(sock_send, &isoframe);
                         /* printf("%s\n", printarray); */
                         send(conn->websocket, sock_send, strlen(sock_send), 0);
+                        canblocks_reset_frame(&isoframe);
                     }
                 }
                 else if(status == CANBLOCKS_COMPRET_ERROR) {

@@ -111,6 +111,8 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame);
 */
 int canblocks_get_frame(struct canblocks_frame *dst);
 
+void canblocks_reset_frame(struct canblocks_frame *dst);
+
 int canblocks_fr2str(char *dst, struct canblocks_frame *src);
 int canblocks_str2fr(char *src, struct canblocks_frame *dst);
 #endif
