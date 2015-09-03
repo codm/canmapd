@@ -41,7 +41,7 @@ THE SOFTWARE.
 
 #define CANBLOCKS_BUFFER_SIZE        20      /* Buffer size can be chosen freely */
 #define CANBLOCKS_BLOCKSIZE          4       /* Maximum 16 Blocks  */
-#define CANBLOCKS_MIN_SEP_TIME       10      /* Min 10ms Seperation time  */
+#define CANBLOCKS_MIN_SEP_TIME       25      /* Min 10ms Seperation time  */
 #define CANBLOCKS_BROADCAST          0xFF    /* Broadcast Adress */
 
 #define CANBLOCKS_STATUS_SF          0x00    /* Single Frame */

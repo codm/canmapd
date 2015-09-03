@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/time.h>
 #include <sys/select.h>
 #include <sys/types.h>
@@ -213,6 +214,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
     uint8_t *datainc;
     fd_set rfds;
     struct timeval tv;
+    struct timespec wait;
 
     /* zero rfds and 10000 usec wait */
     FD_ZERO(&rfds);
@@ -259,9 +261,10 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
             fc_flowstat = recvfc.data[1] & 0x0F;
             fc_blocksize = recvfc.data[2];
             fc_minseptime = recvfc.data[3];
+            wait.tv_nsec = fc_minseptime * 1000000; /* msec to nsec */
         }
     } else {
-        printf("missing flowcontrol... exiting\n");
+        printf("missing, flowcontrol... exiting\n");
         return 0;
     }
 
@@ -287,16 +290,17 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
                 if(recv(*socket, &recvfc, sizeof(struct can_frame), 0)) {
                     if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
                             ((recvfc.data[1] >> 4) == CANBLOCKS_STATUS_FC)) {
-                        fc_flowstat = r2ecvfc.data[1] & 0x0F;
+                        fc_flowstat = recvfc.data[1] & 0x0F;
                         fc_blocksize = recvfc.data[2];
                         fc_minseptime = recvfc.data[3];
+                        wait.tv_nsec = fc_minseptime * 1000000; /* msec to nsec */
                     }
                 } else {
                     printf("missing flowcontrol... exiting\n");
                     return 0;
                 }
             }
-            /* TODO: Wait for ms here */
+            nanosleep(&wait, NULL);
         } else {
             /* compute frame length */
             j = lencnt + 2;
