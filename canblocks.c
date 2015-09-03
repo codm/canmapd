@@ -209,7 +209,7 @@ int canblocks_get_frame(struct canblocks_frame *dst) {
 int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
 
     struct can_frame sframe, recvfc;
-    unsigned int i, r, lencnt, fc_flowstat, fc_blocksize, fc_minseptime;
+    unsigned int i, j, r, lencnt, fc_flowstat, fc_blocksize, fc_minseptime;
     uint8_t *datainc;
     fd_set rfds;
     struct timeval tv;
@@ -222,14 +222,14 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
 
     sframe.can_id = frame->rec;
     datainc = frame->data;
-    lencnt = frame->dl;
     /* single frame */
     if(frame->dl <= 6) {
         sframe.can_dlc = frame->dl + 2;
         sframe.data[0] = frame->sender;
         sframe.data[1] = (CANBLOCKS_STATUS_SF << 4) | frame->dl;
-        for(i = 0; i < frame->dl; i++)
+        for(i = 0; i < frame->dl; i++) {
             sframe.data[i + 2] = *datainc++;
+        }
         r = write(*socket, &sframe, sizeof(struct can_frame));
         if(r > 0)
             return 1;
@@ -237,6 +237,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
             return 0;
     }
 
+    lencnt = frame->dl;
     /* build first frame */
     sframe.can_dlc = 8;
     sframe.data[0] = frame->sender;
@@ -252,19 +253,66 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
 
     r = write(*socket, &sframe, sizeof(struct can_frame));
     /* wait for FC with timeout */
-    printf("send start, wait for flowcontrol...\n");
     if(recv(*socket, &recvfc, sizeof(struct can_frame), 0)) {
-        printf("%x->%x\n", sframe.can_id, sframe.data[0]);
-        printf("%x->%x\n", recvfc.can_id, recvfc.data[0]);
         if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
                 ((recvfc.data[1] >> 4) == CANBLOCKS_STATUS_FC)) {
             fc_flowstat = recvfc.data[1] & 0x0F;
             fc_blocksize = recvfc.data[2];
             fc_minseptime = recvfc.data[3];
-            printf("got fc from %x: BS %x SEPTIME %x FLOWSTAT %x\n", recvfc.can_id, 
-                    fc_blocksize, fc_minseptime, fc_flowstat);
+        }
+    } else {
+        printf("missing flowcontrol... exiting\n");
+        return 0;
+    }
+
+    int cf_count = 1;
+    int block_count = 0;
+
+    while(lencnt > 0) {
+        if(lencnt > 6) {
+            /* build consecutive frame */
+            sframe.can_id = frame->rec;
+            sframe.can_dlc = 8;
+            sframe.data[0] = frame->sender;
+            sframe.data[1] = (CANBLOCKS_STATUS_CF << 4) | cf_count;
+            for(i = 2; i < 8; i++) {
+                sframe.data[i] = *datainc++;
+                lencnt--;
+            } 
+            write(*socket, &sframe, sizeof(struct can_frame));
+            cf_count = (cf_count + 1) % 16;
+            block_count++;
+            if(block_count >= fc_blocksize) {
+                block_count = 0;
+                if(recv(*socket, &recvfc, sizeof(struct can_frame), 0)) {
+                    if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
+                            ((recvfc.data[1] >> 4) == CANBLOCKS_STATUS_FC)) {
+                        fc_flowstat = r2ecvfc.data[1] & 0x0F;
+                        fc_blocksize = recvfc.data[2];
+                        fc_minseptime = recvfc.data[3];
+                    }
+                } else {
+                    printf("missing flowcontrol... exiting\n");
+                    return 0;
+                }
+            }
+            /* TODO: Wait for ms here */
+        } else {
+            /* compute frame length */
+            j = lencnt + 2;
+            sframe.can_id = frame->rec;
+            sframe.can_dlc = j;
+            sframe.data[0] = frame->sender;
+            sframe.data[1] = (CANBLOCKS_STATUS_CF << 4) | cf_count;
+            for(i = 2; i < j; i++) {
+                sframe.data[i] = *datainc++;
+                lencnt--;
+            } 
+            write(*socket, &sframe, sizeof(struct can_frame));
         }
     }
+
+
 
     setsockopt(*socket, SOL_SOCKET, SO_RCVTIMEO, NULL,sizeof(struct timeval));
     /* something went wrong */

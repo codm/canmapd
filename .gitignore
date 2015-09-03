@@ -7,3 +7,4 @@ isotpd
 canblocksd
 *.o
 .fuse*
+._*
