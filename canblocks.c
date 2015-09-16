@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 #include <time.h>
 #include <sys/time.h>
 #include <sys/select.h>
@@ -255,21 +256,25 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
 
     r = write(*socket, &sframe, sizeof(struct can_frame));
     /* wait for FC with timeout */
-    if(recv(*socket, &recvfc, sizeof(struct can_frame), 0)) {
-        if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
-                ((recvfc.data[1] >> 4) == CANBLOCKS_STATUS_FC)) {
+    if(recv(*socket, &recvfc, sizeof(struct can_frame), 0) != -1) {
+        if(errno == EAGAIN || errno == EWOULDBLOCK) {
+            printf("missing, flowcontrol... exiting\n");
+            return 0;
+        } else {
+            if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
+               ((recvfc.data[1] >> 4) == CANBLOCKS_STATUS_FC)) {
             fc_blocksize = recvfc.data[2];
             fc_minseptime = recvfc.data[3];
             wait.tv_nsec = fc_minseptime * 1000000; /* msec to nsec */
+            }
         }
-    } else {
-        printf("missing, flowcontrol... exiting\n");
-        return 0;
     }
 
     int block_count = 1;
 
+    /* while still bytes to send */
     while(lencnt > 0) {
+        /* while not last packet */
         if(lencnt > 6) {
             /* build consecutive frame */
             sframe.can_id = frame->rec;
@@ -280,21 +285,24 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
                 sframe.data[i] = *datainc++;
                 lencnt--;
             } 
+            /* send consecutive frame */
             write(*socket, &sframe, sizeof(struct can_frame));
-            block_count = (block_count + 1) % fc_blocksize;
             if(block_count == fc_blocksize - 1) {
-                if(recv(*socket, &recvfc, sizeof(struct can_frame), 0)) {
-                    if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
-                            ((recvfc.data[1] >> 4) == CANBLOCKS_STATUS_FC)) {
+                if(recv(*socket, &recvfc, sizeof(struct can_frame), 0) != -1) {
+                    if(errno == EAGAIN || errno == EWOULDBLOCK) {
+                        printf("missing, flowcontrol... exiting\n");
+                        return 0;
+                    } else {
+                        if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
+                           ((recvfc.data[1] >> 4) == CANBLOCKS_STATUS_FC)) {
                         fc_blocksize = recvfc.data[2];
                         fc_minseptime = recvfc.data[3];
                         wait.tv_nsec = fc_minseptime * 1000000; /* msec to nsec */
+                        }
                     }
-                } else {
-                    printf("missing flowcontrol... exiting\n");
-                    return 0;
                 }
             }
+            block_count = (block_count + 1) % fc_blocksize;
             nanosleep(&wait, NULL);
         } else {
             /* compute frame length */
