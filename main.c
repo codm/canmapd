@@ -266,6 +266,8 @@ int process_connection(int websock) {
             canblocks_send_frame(&cansocket, &sendframe);
             /* unblock websocket */
             pthread_mutex_unlock(&conn.cansocket_mutex);
+            /* reset sendframe */
+            canblocks_reset_frame(&sendframe);
         };
         /* send(conn.websocket, webbuff, strlen(webbuff), 0); */
     }
