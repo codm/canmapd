@@ -39,7 +39,7 @@ THE SOFTWARE.
    Defines
 */
 
-#define CANBLOCKS_BUFFER_SIZE        20      /* Buffer size can be chosen freely */
+#define CANBLOCKS_BUFFER_SIZE        3      /* Buffer size can be chosen freely */
 #define CANBLOCKS_BLOCKSIZE          4       /* Maximum 16 Blocks  */
 #define CANBLOCKS_MIN_SEP_TIME       25      /* Min 10ms Seperation time  */
 #define CANBLOCKS_BROADCAST          0xFF    /* Broadcast Adress */
@@ -56,6 +56,8 @@ THE SOFTWARE.
 #define CANBLOCKS_FLOWSTAT_CLEAR     0
 #define CANBLOCKS_FLOWSTAT_WAIT      1
 #define CANBLOCKS_FLOWSTAT_OVERFLOW  2
+
+#define CANBLOCKS_GC_TIMEOUT         5
 
 /**
   \brief Abstract struct of a ISO-TP frame
@@ -115,5 +117,6 @@ void canblocks_reset_frame(struct canblocks_frame *dst);
 
 int canblocks_fr2str(char *dst, struct canblocks_frame *src);
 int canblocks_str2fr(char *src, struct canblocks_frame *dst);
-#endif
+int canblocks_clean_garbage(void);
 
+#endif

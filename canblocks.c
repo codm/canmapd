@@ -60,6 +60,7 @@ typedef struct {
     uint8_t *data_ptr; /* pointer to place in frame.data where to write */
     uint16_t data_iter; /* count of written data */
     struct can_frame canframes[CANBLOCKS_BLOCKSIZE];
+    time_t timestamp;
     uint8_t block_counter;
 } canblocksbuff_t;
 
@@ -71,6 +72,7 @@ int _buff_get_pending(canblocksbuff_t **dst, uint8_t senderID);
 void _buff_transfer_canframes(canblocksbuff_t *dst);
 void _buff_reset_field(canblocksbuff_t *dst);
 void _buff_reset_canframes(canblocksbuff_t *dst);
+int canblocks_clean_garbage(void);
 
 /**
   Program Code
@@ -135,6 +137,7 @@ int canblocks_compute_frame(int *socket, struct can_frame *frame) {
                 dst->finished = 0;
                 dst->frame.sender = sender;
                 dst->frame.rec = receiver;
+                dst->timestamp = time(NULL);
                 dl = ((frame->data[1] & 0x0F) << 8) + frame->data[2];
                 dst->frame.dl = dl;
                 dst->frame.data = malloc(dl * sizeof(uint8_t));
@@ -284,7 +287,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
             for(i = 2; i < 8; i++) {
                 sframe.data[i] = *datainc++;
                 lencnt--;
-            } 
+            }
             /* send consecutive frame */
             write(*socket, &sframe, sizeof(struct can_frame));
             if(block_count == fc_blocksize - 1) {
@@ -314,7 +317,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
             for(i = 2; i < j; i++) {
                 sframe.data[i] = *datainc++;
                 lencnt--;
-            } 
+            }
             write(*socket, &sframe, sizeof(struct can_frame));
         }
     }
@@ -444,4 +447,19 @@ void canblocks_reset_frame(struct canblocks_frame *dst) {
     dst->sender = 0;
     dst->rec = 0;
     dst->dl = 0;
+}
+
+int canblocks_clean_garbage(void) {
+    int i;
+    for(i = 0; i < CANBLOCKS_BUFFER_SIZE; i++) {
+        /* if buffer is not free and not finished, and it's timestamp is more
+            than CANBLOCKS_GC_TIMEOUT seconds ago */
+        if((canblocks_buffer[i].free == 0)&&(canblocks_buffer[i].finished == 0)
+            &&(canblocks_buffer[i].timestamp + CANBLOCKS_GC_TIMEOUT <
+                (int)time(NULL))) {
+            _buff_reset_field(&canblocks_buffer[i]);
+            return i;
+        }
+    }
+    return -1;
 }

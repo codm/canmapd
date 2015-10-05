@@ -24,6 +24,7 @@ void sig_term(int sig);
 void print_helptext();
 int process_connection();
 void *can2tcp(void *arg);
+void *canblocks_gc(void *arg);
 
 pid_t pid, sid, connection;
 
@@ -218,7 +219,7 @@ int process_connection(int websock) {
     struct sockaddr_can addr;
     struct ifreq ifr;
     struct canblocks_frame sendframe;
-    pthread_t can2tcpthread;
+    pthread_t can2tcpthread, cangc;
     char webbuff[WEBSOCK_MAX_RECV];
     int webbuffsize, running;
 
@@ -246,6 +247,11 @@ int process_connection(int websock) {
     /* open thread for can_send */
     if(0 != pthread_create(&can2tcpthread, NULL, can2tcp, &conn)) {
         perror("canthread");
+        return 0;
+    }
+    /* open thread for canblocks_gc */
+    if(0 != pthread_create(&cangc, NULL, canblocks_gc, &conn)) {
+        perror("can_gc_thread");
         return 0;
     }
     running = 1;
@@ -320,3 +326,25 @@ void *can2tcp(void *arg) {
     }
 }
 
+/*
+    Cleans up unused fields in canblocks data structure.
+    */
+void *canblocks_gc(void *arg) {
+    struct timespec waittime;
+    struct connection_data* conn;
+    int id;
+
+    waittime.tv_sec = 1;
+    waittime.tv_nsec = 0;
+    conn = (struct connection_data*)arg;
+    char sock_send[512];
+
+    while(1) {
+        nanosleep(&waittime, NULL);
+        id = canblocks_clean_garbage();
+        if(id >= 0) { /* gc happened */
+            sprintf(sock_send, "> [error] buffer reset in field %d\n", id);
+            send(conn->websocket, sock_send, strlen(sock_send), 0);
+        }
+    }
+}
