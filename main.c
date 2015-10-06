@@ -334,7 +334,7 @@ void *canblocks_gc(void *arg) {
     struct connection_data* conn;
     int id;
 
-    waittime.tv_sec = 1;
+    waittime.tv_sec = CANBLOCKS_GC_REFRESH;
     waittime.tv_nsec = 0;
     conn = (struct connection_data*)arg;
     char sock_send[512];

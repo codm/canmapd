@@ -39,9 +39,9 @@ THE SOFTWARE.
    Defines
 */
 
-#define CANBLOCKS_BUFFER_SIZE        3      /* Buffer size can be chosen freely */
-#define CANBLOCKS_BLOCKSIZE          4       /* Maximum 16 Blocks  */
-#define CANBLOCKS_MIN_SEP_TIME       25      /* Min 10ms Seperation time  */
+#define CANBLOCKS_BUFFER_SIZE        64      /* Buffer size can be chosen freely */
+#define CANBLOCKS_BLOCKSIZE          16       /* Maximum 16 Blocks  */
+#define CANBLOCKS_MIN_SEP_TIME       10      /* Min 10ms Seperation time  */
 #define CANBLOCKS_BROADCAST          0xFF    /* Broadcast Adress */
 
 #define CANBLOCKS_STATUS_SF          0x00    /* Single Frame */
@@ -57,7 +57,8 @@ THE SOFTWARE.
 #define CANBLOCKS_FLOWSTAT_WAIT      1
 #define CANBLOCKS_FLOWSTAT_OVERFLOW  2
 
-#define CANBLOCKS_GC_TIMEOUT         5
+#define CANBLOCKS_GC_TIMEOUT         1
+#define CANBLOCKS_GC_REFRESH         2
 
 /**
   \brief Abstract struct of a ISO-TP frame
