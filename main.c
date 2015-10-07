@@ -299,7 +299,7 @@ void *can2tcp(void *arg) {
     conn = (struct connection_data*)arg;
     while(1) {
         nanosleep(&waittime, NULL);
-
+        memset(sock_send, 0, sizeof(sock_send));
         /* if websocket is free */
         if(pthread_mutex_trylock(&conn->cansocket_mutex) != EBUSY) {
             nbytes = recv(conn->cansocket, &frame, sizeof(struct can_frame), MSG_DONTWAIT);
