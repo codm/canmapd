@@ -22,8 +22,8 @@
   THE SOFTWARE.
 
 
-  \brief CANBLOCKS library for SocketCAN
-  This is a CANBLOCKS extended adress implementation for SocketCAN.
+  \brief CANMAP library for SocketCAN
+  This is a CANMAP extended adress implementation for SocketCAN.
 
   @author  Tobias Schmitt
   @email   tobias.schmitt@codm.de
@@ -43,51 +43,53 @@
 #include <sys/ioctl.h>
 #include <string.h>
 
-#include "canblocks.h"
+#include "canmap.h"
 #include "main.h"
 
 /**
-  canblocks-Buffer
+  canmap-Buffer
   this is not a ringbuffer, because the creation of one buffer element and
   it's completion / deletion depends on more than 1 CAN messages, which will
   be send asynchronously. so the buffer functions have to "search" the whole
   array everytime.
   */
 typedef struct {
-    struct canblocks_frame frame;
+    struct canmap_frame frame;
     uint8_t finished;
     uint8_t free;
     uint8_t *data_ptr; /* pointer to place in frame.data where to write */
     uint16_t data_iter; /* count of written data */
-    struct can_frame canframes[CANBLOCKS_BLOCKSIZE];
+    struct can_frame canframes[CANMAP_BLOCKSIZE];
+    time_t timestamp;
     uint8_t block_counter;
-} canblocksbuff_t;
+} canmapbuff_t;
 
-canblocksbuff_t canblocks_buffer[CANBLOCKS_BUFFER_SIZE];
+canmapbuff_t canmap_buffer[CANMAP_BUFFER_SIZE];
 
-int _buff_get_next_free(canblocksbuff_t **dst);
-int _buff_get_finished(canblocksbuff_t **dst);
-int _buff_get_pending(canblocksbuff_t **dst, uint8_t senderID);
-void _buff_transfer_canframes(canblocksbuff_t *dst);
-void _buff_reset_field(canblocksbuff_t *dst);
-void _buff_reset_canframes(canblocksbuff_t *dst);
+int _buff_get_next_free(canmapbuff_t **dst);
+int _buff_get_finished(canmapbuff_t **dst);
+int _buff_get_pending(canmapbuff_t **dst, uint8_t senderID);
+void _buff_transfer_canframes(canmapbuff_t *dst);
+void _buff_reset_field(canmapbuff_t *dst);
+void _buff_reset_canframes(canmapbuff_t *dst);
+int canmap_clean_garbage(void);
 
 /**
   Program Code
   */
 
-void canblocks_init(void) {
+void canmap_init(void) {
     int i;
-    for(i = 0; i < CANBLOCKS_BUFFER_SIZE; i++) {
-        _buff_reset_field(&canblocks_buffer[i]);
+    for(i = 0; i < CANMAP_BUFFER_SIZE; i++) {
+        _buff_reset_field(&canmap_buffer[i]);
     }
 }
 
-int canblocks_compute_frame(int *socket, struct can_frame *frame) {
+int canmap_compute_frame(int *socket, struct can_frame *frame) {
     uint8_t i, status, sender, receiver;
     uint16_t dl;
     uint8_t *dataptr;
-    canblocksbuff_t *dst;
+    canmapbuff_t *dst;
     struct can_frame flowcontrol;
 
     status = (frame->data[1] & 0xF0) >> 4;
@@ -97,16 +99,16 @@ int canblocks_compute_frame(int *socket, struct can_frame *frame) {
     flowcontrol.can_id = sender;
     flowcontrol.can_dlc = 4;
     flowcontrol.data[0] = receiver;
-    flowcontrol.data[1] = ((CANBLOCKS_STATUS_FC << 4)|CANBLOCKS_FLOWSTAT_CLEAR);
-    flowcontrol.data[2] = CANBLOCKS_BLOCKSIZE;
-    flowcontrol.data[3] = CANBLOCKS_MIN_SEP_TIME;
+    flowcontrol.data[1] = ((CANMAP_STATUS_FC << 4)|CANMAP_FLOWSTAT_CLEAR);
+    flowcontrol.data[2] = CANMAP_BLOCKSIZE;
+    flowcontrol.data[3] = CANMAP_MIN_SEP_TIME;
 
-    if(!((receiver == rec_filter) || (receiver == CANBLOCKS_BROADCAST))) {
-        return CANBLOCKS_COMPRET_ERROR;
+    if(!((receiver == rec_filter) || (receiver == CANMAP_BROADCAST))) {
+        return CANMAP_COMPRET_ERROR;
     }
 
     switch(status) {
-        case CANBLOCKS_STATUS_SF:
+        case CANMAP_STATUS_SF:
             /* if single frame */
             if(_buff_get_next_free(&dst)) {
                 dst->free = 0;
@@ -122,19 +124,20 @@ int canblocks_compute_frame(int *socket, struct can_frame *frame) {
                     dataptr++;
                 }
                 dst->finished = 1;
-                return CANBLOCKS_COMPRET_COMPLETE;
+                return CANMAP_COMPRET_COMPLETE;
             }
             else {
                 /* no free buffer */
-                return CANBLOCKS_COMPRET_ERROR;
+                return CANMAP_COMPRET_ERROR;
             }
-        case CANBLOCKS_STATUS_FF:
+        case CANMAP_STATUS_FF:
             /* if first frame */
             if(_buff_get_next_free(&dst)) {
                 dst->free = 0;
                 dst->finished = 0;
                 dst->frame.sender = sender;
                 dst->frame.rec = receiver;
+                dst->timestamp = time(NULL);
                 dl = ((frame->data[1] & 0x0F) << 8) + frame->data[2];
                 dst->frame.dl = dl;
                 dst->frame.data = malloc(dl * sizeof(uint8_t));
@@ -143,15 +146,15 @@ int canblocks_compute_frame(int *socket, struct can_frame *frame) {
                 dst->data_iter = 5;
                 dst->block_counter = 1;
                 if(write(*socket, &flowcontrol, sizeof(struct can_frame)) < 1) {
-                    return CANBLOCKS_COMPRET_ERROR;
+                    return CANMAP_COMPRET_ERROR;
                 }
-                return CANBLOCKS_COMPRET_TRANS;
+                return CANMAP_COMPRET_TRANS;
             }
             else {
                 /* no free buffer */
-                return CANBLOCKS_COMPRET_ERROR;
+                return CANMAP_COMPRET_ERROR;
             }
-        case CANBLOCKS_STATUS_CF:
+        case CANMAP_STATUS_CF:
             /* if consecutive frame */
             if(_buff_get_pending(&dst, sender)) {
                 /* copy frame to canframes at right point */
@@ -164,9 +167,9 @@ int canblocks_compute_frame(int *socket, struct can_frame *frame) {
                     dst->finished = 1;
                     /* copy canframes to frame->data */
                     _buff_transfer_canframes(dst);
-                    return CANBLOCKS_COMPRET_COMPLETE;
+                    return CANMAP_COMPRET_COMPLETE;
                 }
-                if(dst->block_counter >= CANBLOCKS_BLOCKSIZE) {
+                if(dst->block_counter >= CANMAP_BLOCKSIZE) {
                     /* maximum blocks saved */
                     /* copy canframes to frame->data */
                     _buff_transfer_canframes(dst);
@@ -174,22 +177,22 @@ int canblocks_compute_frame(int *socket, struct can_frame *frame) {
                     dst->block_counter = 0;
                     /* send flowcontrol */
                     if(write(*socket, &flowcontrol, sizeof(struct can_frame)) < 1) {
-                        return CANBLOCKS_COMPRET_ERROR;
+                        return CANMAP_COMPRET_ERROR;
                     }
                 }
-                return CANBLOCKS_COMPRET_TRANS;
+                return CANMAP_COMPRET_TRANS;
             }
             else {
                 /* no buffer found */
-                return CANBLOCKS_COMPRET_ERROR;
+                return CANMAP_COMPRET_ERROR;
             }
     }
     /* if the code comes till here, something is very broken */
-    return CANBLOCKS_COMPRET_ERROR;
+    return CANMAP_COMPRET_ERROR;
 }
 
-int canblocks_get_frame(struct canblocks_frame *dst) {
-    canblocksbuff_t *fin = NULL;
+int canmap_get_frame(struct canmap_frame *dst) {
+    canmapbuff_t *fin = NULL;
     if(_buff_get_finished(&fin)) {
 
         /* copy whole struct to dst */
@@ -208,7 +211,7 @@ int canblocks_get_frame(struct canblocks_frame *dst) {
     }
 }
 
-int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
+int canmap_send_frame(int *socket, struct canmap_frame *frame) {
 
     struct can_frame sframe, recvfc;
     unsigned int i, j, r, bytes_remain, fc_blocksize, fc_minseptime;
@@ -229,7 +232,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
     if(frame->dl <= 6) {
         sframe.can_dlc = frame->dl + 2;
         sframe.data[0] = frame->sender;
-        sframe.data[1] = (CANBLOCKS_STATUS_SF << 4) | frame->dl;
+        sframe.data[1] = (CANMAP_STATUS_SF << 4) | frame->dl;
         for(i = 0; i < frame->dl; i++) {
             sframe.data[i + 2] = *datainc++;
         }
@@ -244,7 +247,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
     /* build first frame */
     sframe.can_dlc = 8;
     sframe.data[0] = frame->sender;
-    sframe.data[1] = (CANBLOCKS_STATUS_FF << 4) | ((frame->dl & 0x0F00) >> 8);
+    sframe.data[1] = (CANMAP_STATUS_FF << 4) | ((frame->dl & 0x0F00) >> 8);
     sframe.data[2] = frame->dl & 0x00FF;
     for(i = 3; i < 8; i++) {
         sframe.data[i] = *datainc++;
@@ -262,7 +265,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
             return 0;
         } else {
             if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
-               ((recvfc.data[1] >> 4) == CANBLOCKS_STATUS_FC)) {
+               ((recvfc.data[1] >> 4) == CANMAP_STATUS_FC)) {
             fc_blocksize = recvfc.data[2];
             fc_minseptime = recvfc.data[3];
             wait.tv_nsec = fc_minseptime * 1000000; /* msec to nsec */
@@ -280,7 +283,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
             sframe.can_id = frame->rec;
             sframe.can_dlc = 8;
             sframe.data[0] = frame->sender;
-            sframe.data[1] = (CANBLOCKS_STATUS_CF << 4) | block_count;
+            sframe.data[1] = (CANMAP_STATUS_CF << 4) | block_count;
             for(i = 2; i < 8; i++) {
                 sframe.data[i] = *datainc++;
                 bytes_remain--;
@@ -294,7 +297,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
                         return 0;
                     } else {
                         if((recvfc.can_id == sframe.data[0]) && (recvfc.data[0] == sframe.can_id) &&
-                           ((recvfc.data[1] >> 4) == CANBLOCKS_STATUS_FC)) {
+                           ((recvfc.data[1] >> 4) == CANMAP_STATUS_FC)) {
                         fc_blocksize = recvfc.data[2];
                         fc_minseptime = recvfc.data[3];
                         wait.tv_nsec = fc_minseptime * 1000000; /* msec to nsec */
@@ -310,7 +313,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
             sframe.can_id = frame->rec;
             sframe.can_dlc = j;
             sframe.data[0] = frame->sender;
-            sframe.data[1] = (CANBLOCKS_STATUS_CF << 4) | block_count;
+            sframe.data[1] = (CANMAP_STATUS_CF << 4) | block_count;
             for(i = 2; i < j; i++) {
                 sframe.data[i] = *datainc++;
                 bytes_remain--;
@@ -326,45 +329,45 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
     return 0;
 }
 
-int _buff_get_next_free(canblocksbuff_t **dst) {
+int _buff_get_next_free(canmapbuff_t **dst) {
     int i;
-    for(i = 0; i < CANBLOCKS_BUFFER_SIZE; i++) {
-        if(canblocks_buffer[i].free) {
-            *dst = &canblocks_buffer[i];
+    for(i = 0; i < CANMAP_BUFFER_SIZE; i++) {
+        if(canmap_buffer[i].free) {
+            *dst = &canmap_buffer[i];
             return 1;
         }
     }
     return 0;
 }
 
-int _buff_get_finished(canblocksbuff_t **dst) {
+int _buff_get_finished(canmapbuff_t **dst) {
     int i;
-    for(i = 0; i < CANBLOCKS_BUFFER_SIZE; i++) {
-        if(canblocks_buffer[i].finished) {
-            *dst = &canblocks_buffer[i];
+    for(i = 0; i < CANMAP_BUFFER_SIZE; i++) {
+        if(canmap_buffer[i].finished) {
+            *dst = &canmap_buffer[i];
             return 1;
         }
     }
     return 0;
 }
 
-int _buff_get_pending(canblocksbuff_t **dst, uint8_t senderID) {
+int _buff_get_pending(canmapbuff_t **dst, uint8_t senderID) {
     int i;
-    for(i = 0; i < CANBLOCKS_BUFFER_SIZE; i++) {
-        if(!canblocks_buffer[i].finished && !canblocks_buffer[i].free
-                && canblocks_buffer[i].frame.sender == senderID) {
-            *dst = &canblocks_buffer[i];
+    for(i = 0; i < CANMAP_BUFFER_SIZE; i++) {
+        if(!canmap_buffer[i].finished && !canmap_buffer[i].free
+                && canmap_buffer[i].frame.sender == senderID) {
+            *dst = &canmap_buffer[i];
             return 1;
         }
     }
     return 0;
 }
 
-void _buff_transfer_canframes(canblocksbuff_t *dst) {
+void _buff_transfer_canframes(canmapbuff_t *dst) {
     int i = 0, k = 0;
-    for(i = 0; i < CANBLOCKS_BLOCKSIZE; i++) {
+    for(i = 0; i < CANMAP_BLOCKSIZE; i++) {
         if(dst->canframes[i].can_dlc > 0) {
-            if((dst->canframes[i].data[1] >> 4) == CANBLOCKS_STATUS_FF)
+            if((dst->canframes[i].data[1] >> 4) == CANMAP_STATUS_FF)
                 k = 3;
             else
                 k = 2;
@@ -376,7 +379,7 @@ void _buff_transfer_canframes(canblocksbuff_t *dst) {
     }
 }
 
-void _buff_reset_field(canblocksbuff_t *dst) {
+void _buff_reset_field(canmapbuff_t *dst) {
     dst->finished = 0;
     dst->free = 1;
     dst->data_iter = 0;
@@ -388,9 +391,9 @@ void _buff_reset_field(canblocksbuff_t *dst) {
     _buff_reset_canframes(dst);
 }
 
-void _buff_reset_canframes(canblocksbuff_t *dst) {
+void _buff_reset_canframes(canmapbuff_t *dst) {
     int i,k;
-    for(i = 0; i < CANBLOCKS_BLOCKSIZE; i++) {
+    for(i = 0; i < CANMAP_BLOCKSIZE; i++) {
         dst->canframes[i].can_id = 0;
         dst->canframes[i].can_dlc = 0;
         for(k = 0; k < 8; k++) {
@@ -399,7 +402,7 @@ void _buff_reset_canframes(canblocksbuff_t *dst) {
     }
 }
 
-int canblocks_fr2str(char *dst, struct canblocks_frame *src) {
+int canmap_fr2str(char *dst, struct canmap_frame *src) {
     char *buffer = dst;
     int i, n;
     n = sprintf(buffer, "%02x;", src->sender);
@@ -416,7 +419,7 @@ int canblocks_fr2str(char *dst, struct canblocks_frame *src) {
     return 1;
 }
 
-int canblocks_str2fr(char *src, struct canblocks_frame *dst) {
+int canmap_str2fr(char *src, struct canmap_frame *dst) {
     unsigned int i, sender, rec, dl;
     uint8_t *bufdst;
     char buffer[2*4096]; /* 4096 uint8_t a 2 characters */
@@ -439,9 +442,24 @@ int canblocks_str2fr(char *src, struct canblocks_frame *dst) {
     return 1;
 }
 
-void canblocks_reset_frame(struct canblocks_frame *dst) {
+void canmap_reset_frame(struct canmap_frame *dst) {
     free(dst->data);
     dst->sender = 0;
     dst->rec = 0;
     dst->dl = 0;
+}
+
+int canmap_clean_garbage(void) {
+    int i;
+    for(i = 0; i < CANMAP_BUFFER_SIZE; i++) {
+        /* if buffer is not free and not finished, and it's timestamp is more
+            than CANMAP_GC_TIMEOUT seconds ago */
+        if((canmap_buffer[i].free == 0)&&(canmap_buffer[i].finished == 0)
+            &&(canmap_buffer[i].timestamp + CANMAP_GC_TIMEOUT <
+                (int)time(NULL))) {
+            _buff_reset_field(&canmap_buffer[i]);
+            return i;
+        }
+    }
+    return -1;
 }

@@ -17,13 +17,14 @@
 #include <netinet/in.h>
 
 #include "main.h"
-#include "canblocks.h"
+#include "canmap.h"
 
 int process_connection(int socket);
 void sig_term(int sig);
 void print_helptext();
 int process_connection();
 void *can2tcp(void *arg);
+void *canmap_gc(void *arg);
 
 pid_t pid, sid, connection;
 
@@ -37,7 +38,7 @@ struct connection_data {
 
 struct connection_data conn;
 
-const char DAEMON_NAME[] = "canblocksd";
+const char DAEMON_NAME[] = "canmapd";
 const char DAEMON_VERSION[] = "0.2";
 
 void sig_term(int sig) {
@@ -217,8 +218,8 @@ int process_connection(int websock) {
     int cansocket;
     struct sockaddr_can addr;
     struct ifreq ifr;
-    struct canblocks_frame sendframe;
-    pthread_t can2tcpthread;
+    struct canmap_frame sendframe;
+    pthread_t can2tcpthread, cangc;
     char webbuff[WEBSOCK_MAX_RECV];
     int webbuffsize, running;
 
@@ -248,6 +249,11 @@ int process_connection(int websock) {
         perror("canthread");
         return 0;
     }
+    /* open thread for canmap_gc */
+    if(0 != pthread_create(&cangc, NULL, canmap_gc, &conn)) {
+        perror("can_gc_thread");
+        return 0;
+    }
     running = 1;
     write(conn.websocket, "> hi\n", 6);
     while(running) {
@@ -257,17 +263,17 @@ int process_connection(int websock) {
         if(strcmp("<exit>\n", webbuff) == 0) {
             running = 0;
         }
-        if(canblocks_str2fr(webbuff, &sendframe) > 0) {
+        if(canmap_str2fr(webbuff, &sendframe) > 0) {
             /* printf("msg: %s \n", webbuff); */
 
             /* block websocket */
             pthread_mutex_lock(&conn.cansocket_mutex);
             /* send frame */
-            canblocks_send_frame(&cansocket, &sendframe);
+            canmap_send_frame(&cansocket, &sendframe);
             /* unblock websocket */
             pthread_mutex_unlock(&conn.cansocket_mutex);
             /* reset sendframe */
-            canblocks_reset_frame(&sendframe);
+            canmap_reset_frame(&sendframe);
         };
         /* send(conn.websocket, webbuff, strlen(webbuff), 0); */
     }
@@ -283,17 +289,17 @@ void *can2tcp(void *arg) {
     struct connection_data* conn;
     char sock_send[9000];
     struct can_frame frame;
-    struct canblocks_frame isoframe;
+    struct canmap_frame isoframe;
     struct timespec waittime;
     waittime.tv_sec = 0;
     waittime.tv_nsec = 10000000L;
 
-    canblocks_init();
+    canmap_init();
     /* empty */
     conn = (struct connection_data*)arg;
     while(1) {
         nanosleep(&waittime, NULL);
-
+        memset(sock_send, 0, sizeof(sock_send));
         /* if websocket is free */
         if(pthread_mutex_trylock(&conn->cansocket_mutex) != EBUSY) {
             nbytes = recv(conn->cansocket, &frame, sizeof(struct can_frame), MSG_DONTWAIT);
@@ -302,16 +308,16 @@ void *can2tcp(void *arg) {
             }
             else if (nbytes == sizeof(struct can_frame)) {
                 int status;
-                status = canblocks_compute_frame(&(conn->cansocket), &frame);
-                if(status == CANBLOCKS_COMPRET_COMPLETE) {
-                    if(canblocks_get_frame(&isoframe)) {
-                        canblocks_fr2str(sock_send, &isoframe);
+                status = canmap_compute_frame(&(conn->cansocket), &frame);
+                if(status == CANMAP_COMPRET_COMPLETE) {
+                    if(canmap_get_frame(&isoframe)) {
+                        canmap_fr2str(sock_send, &isoframe);
                         /* printf("%s\n", printarray); */
                         send(conn->websocket, sock_send, strlen(sock_send), 0);
-                        canblocks_reset_frame(&isoframe);
+                        canmap_reset_frame(&isoframe);
                     }
                 }
-                else if(status == CANBLOCKS_COMPRET_ERROR) {
+                else if(status == CANMAP_COMPRET_ERROR) {
                     /* msg still in transmission */
                 }
             }
@@ -320,3 +326,25 @@ void *can2tcp(void *arg) {
     }
 }
 
+/*
+    Cleans up unused fields in canmap data structure.
+    */
+void *canmap_gc(void *arg) {
+    struct timespec waittime;
+    struct connection_data* conn;
+    int id;
+
+    waittime.tv_sec = CANMAP_GC_REFRESH;
+    waittime.tv_nsec = 0;
+    conn = (struct connection_data*)arg;
+    char sock_send[512];
+
+    while(1) {
+        nanosleep(&waittime, NULL);
+        id = canmap_clean_garbage();
+        if(id >= 0) { /* gc happened */
+            sprintf(sock_send, "> [error] buffer reset in field %d\n", id);
+            send(conn->websocket, sock_send, strlen(sock_send), 0);
+        }
+    }
+}

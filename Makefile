@@ -9,13 +9,13 @@
 #
 ##
 
-NAME = canblocksd
+NAME = canmapd
 VERSION = 0.2
 CCFLAGS = -Wall
 CC = gcc $(CCFLAGS)
 LDFLAGS = -lpthread
 
-OBJ = main.o canblocks.o
+OBJ = main.o canmap.o
 all: deploy
 
 debug: CCFLAGS += -DDEBUG -g
