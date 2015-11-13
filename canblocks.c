@@ -211,7 +211,7 @@ int canblocks_get_frame(struct canblocks_frame *dst) {
 int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
 
     struct can_frame sframe, recvfc;
-    unsigned int i, j, r, lencnt, fc_blocksize, fc_minseptime;
+    unsigned int i, j, r, bytes_remain, fc_blocksize, fc_minseptime;
     uint8_t *datainc;
     fd_set rfds;
     struct timeval tv;
@@ -240,7 +240,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
             return 0;
     }
 
-    lencnt = frame->dl;
+    bytes_remain = frame->dl;
     /* build first frame */
     sframe.can_dlc = 8;
     sframe.data[0] = frame->sender;
@@ -248,7 +248,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
     sframe.data[2] = frame->dl & 0x00FF;
     for(i = 3; i < 8; i++) {
         sframe.data[i] = *datainc++;
-        lencnt--;
+        bytes_remain--;
     }
 
     /* set sock option for timeout */
@@ -273,9 +273,9 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
     int block_count = 1;
 
     /* while still bytes to send */
-    while(lencnt > 0) {
+    while(bytes_remain > 0) {
         /* while not last packet */
-        if(lencnt > 6) {
+        if(bytes_remain > 6) {
             /* build consecutive frame */
             sframe.can_id = frame->rec;
             sframe.can_dlc = 8;
@@ -283,7 +283,7 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
             sframe.data[1] = (CANBLOCKS_STATUS_CF << 4) | block_count;
             for(i = 2; i < 8; i++) {
                 sframe.data[i] = *datainc++;
-                lencnt--;
+                bytes_remain--;
             } 
             /* send consecutive frame */
             write(*socket, &sframe, sizeof(struct can_frame));
@@ -306,14 +306,14 @@ int canblocks_send_frame(int *socket, struct canblocks_frame *frame) {
             nanosleep(&wait, NULL);
         } else {
             /* compute frame length */
-            j = lencnt + 2;
+            j = bytes_remain + 2;
             sframe.can_id = frame->rec;
             sframe.can_dlc = j;
             sframe.data[0] = frame->sender;
             sframe.data[1] = (CANBLOCKS_STATUS_CF << 4) | block_count;
             for(i = 2; i < j; i++) {
                 sframe.data[i] = *datainc++;
-                lencnt--;
+                bytes_remain--;
             } 
             write(*socket, &sframe, sizeof(struct can_frame));
         }
