@@ -194,6 +194,7 @@ int main(int argc, const char* argv[]) {
             if(connection == 0) {
                 /* child */
                 pid = getpid();
+                setpgid(pid, pid);
                 if(verbose)
                     printf("connection from %s forked into pid %d\n",
                             inet_ntoa(webclient.sin_addr), (int)pid);
@@ -257,24 +258,31 @@ int process_connection(int websock) {
     running = 1;
     write(conn.websocket, "> hi\n", 6);
     while(running) {
-        if((webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV,0)) < 0)
+        webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, MSG_PEEK);
+        if(webbuffsize < 0) {
             printf("Fehler in websock recv");
-        webbuff[webbuffsize] = '\0';
-        if(strcmp("<exit>\n", webbuff) == 0) {
-            running = 0;
-        }
-        if(canmap_str2fr(webbuff, &sendframe) > 0) {
-            /* printf("msg: %s \n", webbuff); */
+        } else if(webbuffsize == 0) {
+            printf("Client disconnected... shutdown");
+            sig_term(15);
+        } else {
+            webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, 0);
+            webbuff[webbuffsize] = '\0';
+            if(strcmp("<exit>\n", webbuff) == 0) {
+                running = 0;
+            }
+            if(canmap_str2fr(webbuff, &sendframe) > 0) {
+                /* printf("msg: %s \n", webbuff); */
 
-            /* block websocket */
-            pthread_mutex_lock(&conn.cansocket_mutex);
-            /* send frame */
-            canmap_send_frame(&cansocket, &sendframe);
-            /* unblock websocket */
-            pthread_mutex_unlock(&conn.cansocket_mutex);
-            /* reset sendframe */
-            canmap_reset_frame(&sendframe);
-        };
+                /* block websocket */
+                pthread_mutex_lock(&conn.cansocket_mutex);
+                /* send frame */
+                canmap_send_frame(&cansocket, &sendframe);
+                /* unblock websocket */
+                pthread_mutex_unlock(&conn.cansocket_mutex);
+                /* reset sendframe */
+                canmap_reset_frame(&sendframe);
+            };
+        }
         /* send(conn.websocket, webbuff, strlen(webbuff), 0); */
     }
 
