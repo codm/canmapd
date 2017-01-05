@@ -88,7 +88,7 @@ int main(int argc, const char* argv[]) {
     run_daemon = 0;
     virtualcan = 0;
     rec_filter = 0;
-    listenport = "25005";
+    listenport = "25025";
     device = "can0";
     rec_filter = 0x00;
     for(i=0; i < argc; i++) {
