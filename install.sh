@@ -25,10 +25,12 @@ if [ ! -d "$SYSTEMDDIR" ]; then
 fi
 
 echo "4/ make"
+cd src
 make
+cd ..
 
 echo "5/ copy files"
-cp canmapd $PROGRAMDIR
+cp src/canmapd $PROGRAMDIR
 cp canmapd.service $SYSTEMDDIR
 
 echo "6/ restart services"

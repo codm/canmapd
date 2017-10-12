@@ -256,7 +256,6 @@ int process_connection(int websock) {
         return 0;
     }
     running = 1;
-    write(conn.websocket, "> hi\n", 6);
     while(running) {
         webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, MSG_PEEK);
         if(webbuffsize < 0) {
