@@ -287,7 +287,7 @@ int canmap_send_frame(int *socket, struct canmap_frame *frame) {
             for(i = 2; i < 8; i++) {
                 sframe.data[i] = *datainc++;
                 bytes_remain--;
-            } 
+            }
             /* send consecutive frame */
             write(*socket, &sframe, sizeof(struct can_frame));
             if(block_count == fc_blocksize - 1) {
@@ -317,7 +317,7 @@ int canmap_send_frame(int *socket, struct canmap_frame *frame) {
             for(i = 2; i < j; i++) {
                 sframe.data[i] = *datainc++;
                 bytes_remain--;
-            } 
+            }
             write(*socket, &sframe, sizeof(struct can_frame));
         }
     }
@@ -452,11 +452,13 @@ void canmap_reset_frame(struct canmap_frame *dst) {
 int canmap_clean_garbage(void) {
     int i;
     for(i = 0; i < CANMAP_BUFFER_SIZE; i++) {
+        time_t timeNow = time(NULL);
+        double timeDiff = difftime(timeNow, canmap_buffer[i].timestamp);
         /* if buffer is not free and not finished, and it's timestamp is more
             than CANMAP_GC_TIMEOUT seconds ago */
         if((canmap_buffer[i].free == 0)&&(canmap_buffer[i].finished == 0)
-            &&(canmap_buffer[i].timestamp + CANMAP_GC_TIMEOUT <
-                (int)time(NULL))) {
+          && (timeDiff > CANMAP_GC_TIMEOUT)) {
+            //syslog(LOG_INFO, "!!! canmap_clean_garbage !!! timeDiff=%f", timeDiff);
             _buff_reset_field(&canmap_buffer[i]);
             return i;
         }
