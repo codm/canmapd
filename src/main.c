@@ -98,7 +98,7 @@ int main(int argc, const char* argv[]) {
         else if (!strcmp(argv[i], "--daemon") || !strcmp(argv[i], "-d")) {
             run_daemon = 1;
         }
-        else if (!strcmp(argv[i], "--device") || !strcmp(argv[i], "-V")) {
+        else if (!strcmp(argv[i], "--device") || !strcmp(argv[i], "-D")) {
             i++;
             device = argv[i];
         }
