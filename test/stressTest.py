@@ -14,11 +14,57 @@
 import os
 import sys
 import socket
+import time
+import random
 
-print("Hello World")
+## init stuff
+random.seed()
 
 ## Short sumup of functionality:
 
-# load commandline arguments
+# TODO: load commandline arguments
 # establish connections
+try:
+    sockIn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sockOut = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+except OSError as msg:
+    print(msg)
+    sys.exit(1)
+
+try:
+    sockIn.connect(("127.0.0.1", 35035))
+    sockOut.connect(("127.0.0.1", 35036))
+except socket.timeout:
+    print("connection could not be established")
+    sys.exit(1)
+
+print("connection established")
 # spam and receive messages (maybe multithreaded?)
+# generate message
+for runs in range(20):
+    length = random.randint(256, 256) # crash when higher than 255
+    messageString = "00;01;{:04d};".format(length)
+    for i in range(0,length):
+        rndNum = random.randint(0, 128)
+        messageString = messageString + "{:02x}".format(rndNum)
+    messageString = messageString + "\n";
+    stringlen = 11 + length*2 + 1
+    if len(messageString) != stringlen:
+        print("message length inconsistent")
+    else:
+        sockIn.send(messageString)
+        time.sleep(2)
+        response = sockOut.recv(stringlen)
+        if response == messageString:
+            print("message transferred correctly")
+        else:
+            print("\n\n\nmessage string wrong")
+            print("-------ORIGINAL strlen({:d})".format(stringlen))
+            print(messageString)
+            print("-------RESPONSE strlen({:d})".format(len(response)))
+            print(response)
+            print("-----------------\n\n\n")
+
+# cleanup and close
+sockIn.close()
+sockOut.close()
