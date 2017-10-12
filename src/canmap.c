@@ -430,7 +430,7 @@ int canmap_str2fr(char *src, struct canmap_frame *dst) {
     };
     dst->sender = (uint8_t)sender;
     dst->rec = (uint8_t)rec;
-    dst->dl = (uint8_t)dl;
+    dst->dl = (uint16_t)dl;
     dst->data = malloc(sizeof(uint8_t) * dst->dl);
     bufdst = dst->data;
     for(i = 0; i < dst->dl; i++) {
