@@ -294,7 +294,7 @@ int process_connection(int websock) {
 void *can2tcp(void *arg) {
     int nbytes;
     struct connection_data* conn;
-    char sock_send[9000];
+    char sock_send[10000];
     struct can_frame frame;
     struct canmap_frame isoframe;
     struct timespec waittime;

@@ -422,7 +422,7 @@ int canmap_fr2str(char *dst, struct canmap_frame *src) {
 int canmap_str2fr(char *src, struct canmap_frame *dst) {
     unsigned int i, sender, rec, dl;
     uint8_t *bufdst;
-    char buffer[2*4096]; /* 4096 uint8_t a 2 characters */
+    char buffer[10000]; /* 4096 uint8_t a 2 characters */
     char *bufbuff = buffer;
     /* TODO: Secure this input via regex */
     if(sscanf(src, "%02x;%02x;%04u;%s", &sender, &rec, &dl, buffer) < 1) {
@@ -458,6 +458,7 @@ int canmap_clean_garbage(void) {
             than CANMAP_GC_TIMEOUT seconds ago */
         if((canmap_buffer[i].free == 0)&&(canmap_buffer[i].finished == 0)
           && (timeDiff > CANMAP_GC_TIMEOUT)) {
+            printf("gc cleanup(%d). begin %f", i, timeDiff);
             //syslog(LOG_INFO, "!!! canmap_clean_garbage !!! timeDiff=%f", timeDiff);
             _buff_reset_field(&canmap_buffer[i]);
             return i;

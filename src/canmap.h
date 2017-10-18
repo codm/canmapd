@@ -40,8 +40,8 @@ THE SOFTWARE.
 */
 
 #define CANMAP_BUFFER_SIZE        64      /* Buffer size can be chosen freely */
-#define CANMAP_BLOCKSIZE          8       /* Maximum 16 Blocks  */
-#define CANMAP_MIN_SEP_TIME       1      /* Min 10ms Seperation time  */
+#define CANMAP_BLOCKSIZE          12       /* Maximum 16 Blocks  */
+#define CANMAP_MIN_SEP_TIME       0      /* Min 10ms Seperation time  */
 #define CANMAP_BROADCAST          0xFF    /* Broadcast Adress */
 #define CANMAP_MAXFRAMESIZE       4096    /* Maximum canmap frame size */
 

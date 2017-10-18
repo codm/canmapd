@@ -2,7 +2,7 @@
 #define MAIN_H
 
 #define GL_OWN_CAN_ID 0x00
-#define WEBSOCK_MAX_RECV 1024
+#define WEBSOCK_MAX_RECV 16000
 
 
 
