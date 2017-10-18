@@ -299,7 +299,7 @@ void *can2tcp(void *arg) {
     struct canmap_frame isoframe;
     struct timespec waittime;
     waittime.tv_sec = 0;
-    waittime.tv_nsec = 10000000L;
+    waittime.tv_nsec = 10000L;
 
     canmap_init();
     /* empty */

@@ -41,8 +41,8 @@ except socket.timeout:
 print("connection established")
 # spam and receive messages (maybe multithreaded?)
 # generate message
-for runs in range(250):
-    length = random.randint(200, 300) # crash when higher than 255
+for runs in range(25):
+    length = random.randint(4050, 4050)
     messageString = "00;01;{:04d};".format(length)
     for i in range(0,length):
         rndNum = random.randint(0, 128)
@@ -56,7 +56,7 @@ for runs in range(250):
         sockIn.send(messageString)
         response = sockOut.recv(stringlen)
         if response == messageString:
-            print("message transferred correctly")
+            print("message transferred correctly {:d}".format(length))
         else:
             print("\n\n\nmessage string wrong")
             print("-------ORIGINAL strlen({:d})".format(stringlen))
