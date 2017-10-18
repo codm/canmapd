@@ -58,8 +58,8 @@ THE SOFTWARE.
 #define CANMAP_FLOWSTAT_WAIT      1
 #define CANMAP_FLOWSTAT_OVERFLOW  2
 
-#define CANMAP_GC_TIMEOUT         1
-#define CANMAP_GC_REFRESH         2
+#define CANMAP_GC_TIMEOUT         20
+#define CANMAP_GC_REFRESH         60
 
 /**
   \brief Abstract struct of a ISO-TP frame
