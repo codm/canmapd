@@ -13,6 +13,7 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <linux/can.h>
+#include <linux/can/raw.h>
 #include <linux/if.h>
 #include <netinet/in.h>
 
@@ -33,7 +34,7 @@ struct connection_data {
     int websocket;
     struct sockaddr_in webclient;
     struct sockaddr_in webserver;
-    pthread_mutex_t cansocket_mutex;
+    pthread_mutex_t canlock;
 };
 
 struct connection_data conn;
@@ -66,7 +67,7 @@ void print_helptext() {
     printf("    --device  (-D) sets can device\n");
     printf("    --port    (-p) Port where daemon listens\n");
     printf("    --daemon  (-d) start as a daemon\n");
-    printf("    --filter  (-h) set filter for incoming messages (default 0)\n");
+    printf("    --filter  (-f) set filter for incoming messages (default 0)\n");
     printf("    --help    (-h) prints this helptext\n");
     exit(EXIT_SUCCESS);
 }
@@ -180,9 +181,9 @@ int main(int argc, const char* argv[]) {
     /* install sighandle for main process */
     signal(SIGTERM, sig_term);
     signal(SIGINT, sig_term);
-    syslog(LOG_INFO, "%s (%s) started", DAEMON_NAME, DAEMON_VERSION);
+    syslog(LOG_INFO, "%s (%s - built %s %s) started", DAEMON_NAME, DAEMON_VERSION,  __DATE__, __TIME__);
     if(verbose) {
-        printf("%s (%s) started %d\n", DAEMON_NAME, DAEMON_VERSION, (int)pid);
+        printf("%s (%s - built %s %s) started %d\n", DAEMON_NAME, DAEMON_VERSION, __DATE__, __TIME__, (int)pid);
         printf("ip:port %s:%d\n", inet_ntoa(webserv.sin_addr), ntohs(webserv.sin_port));
         printf("receive: %d\n", rec_filter);
     }
@@ -244,7 +245,6 @@ int process_connection(int websock) {
     conn.websocket = websock;
 
     /* initialize websocket mutex */
-    pthread_mutex_init(&(conn.cansocket_mutex), NULL);
     /* open thread for can_send */
     if(0 != pthread_create(&can2tcpthread, NULL, can2tcp, &conn)) {
         perror("canthread");
@@ -259,9 +259,9 @@ int process_connection(int websock) {
     while(running) {
         webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, MSG_PEEK);
         if(webbuffsize < 0) {
-            printf("Fehler in websock recv");
+            printf("error in websock recv\n");
         } else if(webbuffsize == 0) {
-            printf("Client disconnected... shutdown");
+            printf("Client disconnected... shutdown\n");
             sig_term(15);
         } else {
             webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, 0);
@@ -270,19 +270,12 @@ int process_connection(int websock) {
                 running = 0;
             }
             if(canmap_str2fr(webbuff, &sendframe) > 0) {
-                /* printf("msg: %s \n", webbuff); */
-
-                /* block websocket */
-                pthread_mutex_lock(&conn.cansocket_mutex);
-                /* send frame */
+                pthread_mutex_lock(&(conn.canlock));
                 canmap_send_frame(&cansocket, &sendframe);
-                /* unblock websocket */
-                pthread_mutex_unlock(&conn.cansocket_mutex);
-                /* reset sendframe */
                 canmap_reset_frame(&sendframe);
-            };
+                pthread_mutex_unlock(&(conn.canlock));
+            }
         }
-        /* send(conn.websocket, webbuff, strlen(webbuff), 0); */
     }
 
     /* close */
@@ -292,44 +285,57 @@ int process_connection(int websock) {
 }
 
 void *can2tcp(void *arg) {
+    /* experimental for second receiving socket */
+    int cansocket;
+    struct sockaddr_can addr;
+    struct ifreq ifr;
+    struct can_filter rfilter;
+
     int nbytes;
     struct connection_data* conn;
     char sock_send[10000];
     struct can_frame frame;
     struct canmap_frame isoframe;
-    struct timespec waittime;
-    waittime.tv_sec = 0;
-    waittime.tv_nsec = 10000L;
+
+    /* experimental for second receiving socket */
+    cansocket = socket(PF_CAN, SOCK_RAW, CAN_RAW);
+    if(cansocket < 0) {
+        syslog(LOG_ERR, "was not able to init cansock");
+        exit(EXIT_FAILURE);
+    }
+    strcpy(ifr.ifr_name, device);
+    ioctl(cansocket, SIOCGIFINDEX, &ifr);
+    addr.can_family = AF_CAN;
+    addr.can_ifindex = ifr.ifr_ifindex;
+    rfilter.can_id   = rec_filter;
+    rfilter.can_mask = (CAN_EFF_FLAG | CAN_RTR_FLAG | CAN_SFF_MASK);
+    setsockopt(cansocket, SOL_CAN_RAW, CAN_RAW_FILTER, &rfilter, sizeof(rfilter));
+    bind(cansocket, (struct sockaddr *)&addr, sizeof(addr));
 
     canmap_init();
     /* empty */
     conn = (struct connection_data*)arg;
     while(1) {
-        nanosleep(&waittime, NULL);
-        memset(sock_send, 0, sizeof(sock_send));
         /* if websocket is free */
-        if(pthread_mutex_trylock(&conn->cansocket_mutex) != EBUSY) {
-            nbytes = recv(conn->cansocket, &frame, sizeof(struct can_frame), MSG_DONTWAIT);
-            if(nbytes < 0) {
-                /* nothing */
-            }
-            else if (nbytes == sizeof(struct can_frame)) {
-                int status;
-                status = canmap_compute_frame(&(conn->cansocket), &frame);
-                if(status == CANMAP_COMPRET_COMPLETE) {
-                    if(canmap_get_frame(&isoframe)) {
-                        canmap_fr2str(sock_send, &isoframe);
-                        /* printf("%s\n", printarray); */
-                        send(conn->websocket, sock_send, strlen(sock_send), 0);
-                        canmap_reset_frame(&isoframe);
-                    }
-                }
-                else if(status == CANMAP_COMPRET_ERROR) {
-                    /* msg still in transmission */
+        nbytes = recv(cansocket, &frame, sizeof(struct can_frame), MSG_PEEK);
+        pthread_mutex_lock(&(conn->canlock));
+        nbytes = recv(cansocket, &frame, sizeof(struct can_frame), 0);
+        if (nbytes == sizeof(struct can_frame)) {
+            int status;
+            status = canmap_compute_frame(&(cansocket), &frame);
+            if(status == CANMAP_COMPRET_COMPLETE) {
+                if(canmap_get_frame(&isoframe)) {
+                    memset(sock_send, 0, sizeof(sock_send));
+                    canmap_fr2str(sock_send, &isoframe);
+                    send(conn->websocket, sock_send, strlen(sock_send), 0);
+                    canmap_reset_frame(&isoframe);
                 }
             }
-            pthread_mutex_unlock(&conn->cansocket_mutex);
+            else if(status == CANMAP_COMPRET_ERROR) {
+                /* msg still in transmission */
+            }
         }
+        pthread_mutex_unlock(&(conn->canlock));
     }
 }
 

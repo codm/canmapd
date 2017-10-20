@@ -38,14 +38,16 @@ except socket.timeout:
     print("connection could not be established")
     sys.exit(1)
 
-print("connection established")
+print("connection established... wait for boot")
 # spam and receive messages (maybe multithreaded?)
 # generate message
-for runs in range(25):
-    length = random.randint(4050, 4050)
+time.sleep(1) # give a second to boot
+messageCount = 100000
+for runs in range(messageCount):
+    length = random.randint(32, 64)
     messageString = "00;01;{:04d};".format(length)
     for i in range(0,length):
-        rndNum = random.randint(0, 128)
+        rndNum = random.randint(0, 255)
         messageString = messageString + "{:02x}".format(rndNum)
         #messageString = messageString + "ff"
     messageString = messageString + "\n";
@@ -64,6 +66,7 @@ for runs in range(25):
             print("-------RESPONSE strlen({:d})".format(len(response)))
             print(response)
             print("-----------------\n\n\n")
+print("finished " + str(messageCount) + " messages")
 
 # cleanup and close
 sockIn.close()
