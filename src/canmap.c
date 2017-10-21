@@ -42,6 +42,7 @@
 #include <netinet/in.h>
 #include <sys/ioctl.h>
 #include <string.h>
+//#include <syslog.h>
 
 #include "canmap.h"
 #include "main.h"
@@ -162,6 +163,7 @@ int canmap_compute_frame(int *socket, struct can_frame *frame) {
                 memcpy(&dst->canframes[sequenceNr], frame, sizeof(struct can_frame));
                 dst->data_iter += frame->can_dlc - 2;
                 dst->block_counter++;
+                dst->timestamp = time(NULL);
                 if(dst->data_iter == dst->frame.dl) {
                     /* transmission finished */
                     dst->finished = 1;
@@ -466,3 +468,4 @@ int canmap_clean_garbage(void) {
     }
     return -1;
 }
+
