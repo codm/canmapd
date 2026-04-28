@@ -52,7 +52,7 @@ THE SOFTWARE.
 
 #define CANMAP_COMPRET_COMPLETE   1       /* Transmission Complete */
 #define CANMAP_COMPRET_TRANS      0       /* Transmission pending... */
-#define CANMAP_COMPRET_ERROR      -1      /* No ISO-TP Frame or no fre buffer */
+#define CANMAP_COMPRET_ERROR      -1      /* No ISO-TP Frame or no free buffer */
 
 #define CANMAP_FLOWSTAT_CLEAR     0
 #define CANMAP_FLOWSTAT_WAIT      1

@@ -324,15 +324,23 @@ void *can2tcp(void *arg) {
     conn = (struct connection_data*)arg;
     while(1) {
         /* if websocket is free */
-        nbytes = recv(cansocket, &frame, sizeof(struct can_frame), MSG_PEEK);
-        pthread_mutex_lock(&(conn->canlock));
         nbytes = recv(cansocket, &frame, sizeof(struct can_frame), 0);
-        if (nbytes == sizeof(struct can_frame)) {
+        if (nbytes > 0) {
+            if (verbose > 0) {
+                printf("can in: 0x%02x (%d)", frame.can_id, frame.len);
+            }
+            pthread_mutex_lock(&(conn->canlock));
             int status;
             status = canmap_compute_frame(&(cansocket), &frame);
             if(status == CANMAP_COMPRET_COMPLETE) {
                 if(canmap_get_frame(&isoframe)) {
+                    if (verbose > 0) {
+                        printf("canmap complete: 0x%02x->0x%02x (%04d)", isoframe.sender, isoframe.rec, isoframe.dl);
+                    }
                     memset(sock_send, 0, sizeof(sock_send));
+                    if (verbose > 0) {
+                        printf("tcp out: %s", sock_send);
+                    }
                     canmap_fr2str(sock_send, &isoframe);
                     send(conn->websocket, sock_send, strlen(sock_send), 0);
                     canmap_reset_frame(&isoframe);
@@ -341,8 +349,8 @@ void *can2tcp(void *arg) {
             else if(status == CANMAP_COMPRET_ERROR) {
                 /* msg still in transmission */
             }
+            pthread_mutex_unlock(&(conn->canlock));
         }
-        pthread_mutex_unlock(&(conn->canlock));
     }
 }
 
