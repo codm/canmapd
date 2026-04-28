@@ -129,6 +129,7 @@ int canmap_compute_frame(int *socket, struct can_frame *frame) {
             }
             else {
                 /* no free buffer */
+                printf("fatal: no free buffer available");
                 return CANMAP_COMPRET_ERROR;
             }
         case CANMAP_STATUS_FF:
@@ -147,12 +148,14 @@ int canmap_compute_frame(int *socket, struct can_frame *frame) {
                 dst->data_iter = 5;
                 dst->block_counter = 1;
                 if(write(*socket, &flowcontrol, sizeof(struct can_frame)) < 1) {
+                    printf("fatal: cannot send flowcontrol frame");
                     return CANMAP_COMPRET_ERROR;
                 }
                 return CANMAP_COMPRET_TRANS;
             }
             else {
                 /* no free buffer */
+                printf("fatal: no free buffer available");
                 return CANMAP_COMPRET_ERROR;
             }
         case CANMAP_STATUS_CF:
@@ -179,6 +182,7 @@ int canmap_compute_frame(int *socket, struct can_frame *frame) {
                     dst->block_counter = 0;
                     /* send flowcontrol */
                     if(write(*socket, &flowcontrol, sizeof(struct can_frame)) < 1) {
+                        printf("fatal: cannot send flowcontrol frame");
                         return CANMAP_COMPRET_ERROR;
                     }
                 }
@@ -186,10 +190,12 @@ int canmap_compute_frame(int *socket, struct can_frame *frame) {
             }
             else {
                 /* no buffer found */
+                printf("fatal: no buffer found for consecutive frame");
                 return CANMAP_COMPRET_ERROR;
             }
     }
     /* if the code comes till here, something is very broken */
+    printf("fatal: frame cannot be processed as canmap frame");
     return CANMAP_COMPRET_ERROR;
 }
 
