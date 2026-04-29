@@ -16,6 +16,7 @@
 #include <linux/can/raw.h>
 #include <linux/if.h>
 #include <netinet/in.h>
+#include <sys/wait.h>
 
 #include "main.h"
 #include "canmap.h"
@@ -48,6 +49,10 @@ struct connection_data conn;
 
 const char DAEMON_NAME[] = "canmapd";
 const char DAEMON_VERSION[] = "0.2";
+
+void sig_chld(int signo) {
+    while (waitpid(-1, NULL, WNOHANG) > 0);
+}
 
 void sig_term(int sig) {
     /* shutting down program properly */
@@ -121,6 +126,8 @@ int main(int argc, const char* argv[]) {
             return 0;
         }
     }
+
+    signal(SIGCHLD, sig_chld);
 
     /*
        register signal handlers
