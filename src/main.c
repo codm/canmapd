@@ -23,14 +23,14 @@ uint8_t verbose; /* defines if program runs in verbose mode */
 uint8_t run_daemon; /* defines if program runs in daemon mode */
 uint8_t virtualcan; /* defines if virtual can vcan0 is used */
 uint8_t rec_filter; /* fiter ID for receiving stuff */
-const char* listenport; /* port where daemon listen for messages TCP->CAN */
-const char* device; /* CAN device */
+const char *listenport; /* port where daemon listen for messages TCP->CAN */
+const char *device; /* CAN device */
 
 int process_connection(int websocket);
 void sig_term(int sig);
 void print_helptext();
-void *can2tcp(void *arg);
-void *canmap_gc(void *arg);
+void * can2tcp(void *arg);
+void * canmap_gc(void *arg);
 
 pid_t pid, sid, connection;
 
@@ -81,7 +81,7 @@ void print_helptext() {
 /*
     main loop
 */
-int main(const int argc, const char* argv[]) {
+int main(const int argc, const char *argv[]) {
     /* init vars */
     struct sockaddr_in webclient, webserv;
     /*
@@ -95,8 +95,8 @@ int main(const int argc, const char* argv[]) {
     listenport = "25025";
     device = "can0";
     rec_filter = 0x00;
-    for(int i = 0; i < argc; i++) {
-        if(!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-v")) {
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-v")) {
             verbose = 1;
         }
         else if (!strcmp(argv[i], "--daemon") || !strcmp(argv[i], "-d")) {
@@ -125,16 +125,16 @@ int main(const int argc, const char* argv[]) {
     /*
        register signal handlers
     */
-    if(run_daemon) {
+    if (run_daemon) {
         /* fork off parent */
         pid = fork();
         /* not good */
-        if(pid < 0) {
+        if (pid < 0) {
             printf("[daemon] error! exiting\n");
             exit(EXIT_FAILURE);
         }
         /* good */
-        if(pid > 0) {
+        if (pid > 0) {
             printf("[daemon] forked into pid %d\n", pid);
             exit(EXIT_SUCCESS);
         }
@@ -150,9 +150,9 @@ int main(const int argc, const char* argv[]) {
     */
     openlog(DAEMON_NAME, 0, LOG_USER);
 
-    if(run_daemon) {
+    if (run_daemon) {
         sid = setsid();
-        if(sid < 0) {
+        if (sid < 0) {
             syslog(LOG_ERR, "%s", "was not able to get session id");
             exit(EXIT_FAILURE);
         }
@@ -162,7 +162,7 @@ int main(const int argc, const char* argv[]) {
        WEBSOCKET
     */
     conn.websocket = socket(AF_INET, SOCK_STREAM, 0);
-    if(conn.websocket < 0) {
+    if (conn.websocket < 0) {
         syslog(LOG_ERR, "was not able to initiate websocket");
         exit(EXIT_FAILURE);
     }
@@ -171,11 +171,11 @@ int main(const int argc, const char* argv[]) {
     webserv.sin_family = AF_INET;
     webserv.sin_addr.s_addr = inet_addr("127.0.0.1");
     webserv.sin_port = htons(atoi(listenport));
-    if(bind(conn.websocket, (struct sockaddr*)&webserv, sizeof(webserv)) < 0) {
+    if (bind(conn.websocket, (struct sockaddr*)&webserv, sizeof(webserv)) < 0) {
         syslog(LOG_ERR, "was not able to bind webserver");
         exit(EXIT_FAILURE);
     }
-    if(listen(conn.websocket, 9) < 0) {
+    if (listen(conn.websocket, 9) < 0) {
         syslog(LOG_ERR, "not able to register listen");
         exit(EXIT_FAILURE);
     }
@@ -185,22 +185,22 @@ int main(const int argc, const char* argv[]) {
     /* install sighandle for main process */
     signal(SIGTERM, sig_term);
     signal(SIGINT, sig_term);
-    syslog(LOG_INFO, "%s (%s - built %s %s) started", DAEMON_NAME, DAEMON_VERSION,  __DATE__, __TIME__);
-    if(verbose) {
+    syslog(LOG_INFO, "%s (%s - built %s %s) started", DAEMON_NAME, DAEMON_VERSION, __DATE__, __TIME__);
+    if (verbose) {
         printf("%s (%s - built %s %s) started %d\n", DAEMON_NAME, DAEMON_VERSION, __DATE__, __TIME__, (int)pid);
         printf("ip:port %s:%d\n", inet_ntoa(webserv.sin_addr), ntohs(webserv.sin_port));
         printf("receive: %d\n", rec_filter);
     }
     socklen_t len = sizeof(webclient);
-    while(1) {
+    while (1) {
         const int newsock = accept(conn.websocket, (struct sockaddr*)&webclient, &len);
-        if(newsock > 0) {
+        if (newsock > 0) {
             connection = fork();
-            if(connection == 0) {
+            if (connection == 0) {
                 /* child */
                 pid = getpid();
                 setpgid(pid, pid);
-                if(verbose) {
+                if (verbose) {
                     printf("connection from %s forked into pid %d\n", inet_ntoa(webclient.sin_addr), (int)pid);
                 }
                 conn.webclient = webclient;
@@ -229,7 +229,7 @@ int process_connection(const int websocket) {
        CANSOCKET
     */
     cansocket = socket(PF_CAN, SOCK_RAW, CAN_RAW);
-    if(cansocket < 0) {
+    if (cansocket < 0) {
         syslog(LOG_ERR, "was not able to init cansock");
         exit(EXIT_FAILURE);
     }
@@ -237,7 +237,7 @@ int process_connection(const int websocket) {
     ioctl(cansocket, SIOCGIFINDEX, &ifr);
     addr.can_family = AF_CAN;
     addr.can_ifindex = ifr.ifr_ifindex;
-    const int bound = bind(cansocket, (struct sockaddr *)&addr, sizeof(addr));
+    const int bound = bind(cansocket, (struct sockaddr*)&addr, sizeof(addr));
     if (bound < 0) {
         printf("Could not bind can socket for connection");
         exit(EXIT_FAILURE);
@@ -248,36 +248,38 @@ int process_connection(const int websocket) {
 
     /* initialize websocket mutex */
     /* open thread for can_send */
-    if(0 != pthread_create(&can2tcpthread, NULL, can2tcp, &conn)) {
+    if (0 != pthread_create(&can2tcpthread, NULL, can2tcp, &conn)) {
         perror("canthread");
         return 0;
     }
     /* open thread for canmap_gc */
-    if(0 != pthread_create(&cangc, NULL, canmap_gc, &conn)) {
+    if (0 != pthread_create(&cangc, NULL, canmap_gc, &conn)) {
         perror("can_gc_thread");
         return 0;
     }
     int running = 1;
-    while(running) {
+    while (running) {
         ssize_t webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, MSG_PEEK);
-        if(webbuffsize < 0) {
+        if (webbuffsize < 0) {
             printf("error in websock recv\n");
-	    running = 0;
-        } else if(webbuffsize == 0) {
+            running = 0;
+        }
+        else if (webbuffsize == 0) {
             printf("Client disconnected... shutdown\n");
             running = 0;
-        } else {
+        }
+        else {
             webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, 0);
             webbuff[webbuffsize] = '\0';
-            if(strcmp("<exit>\n", webbuff) == 0) {
+            if (strcmp("<exit>\n", webbuff) == 0) {
                 running = 0;
             }
-            if(canmap_str2fr(webbuff, &sendframe) > 0) {
+            if (canmap_str2fr(webbuff, &sendframe) > 0) {
                 pthread_mutex_lock(&(conn.canlock));
                 canmap_send_frame(&cansocket, &sendframe);
                 canmap_reset_frame(&sendframe);
                 pthread_mutex_unlock(&(conn.canlock));
-		printf("msg: %s\n", webbuff);
+                printf("msg: %s\n", webbuff);
             }
         }
     }
@@ -288,7 +290,7 @@ int process_connection(const int websocket) {
     return 1;
 }
 
-void *can2tcp(void *arg) {
+void * can2tcp(void *arg) {
     /* experimental for second receiving socket */
     int cansocket;
     struct sockaddr_can addr;
@@ -301,7 +303,7 @@ void *can2tcp(void *arg) {
 
     /* experimental for second receiving socket */
     cansocket = socket(PF_CAN, SOCK_RAW, CAN_RAW);
-    if(cansocket < 0) {
+    if (cansocket < 0) {
         syslog(LOG_ERR, "was not able to init cansock");
         exit(EXIT_FAILURE);
     }
@@ -309,10 +311,10 @@ void *can2tcp(void *arg) {
     ioctl(cansocket, SIOCGIFINDEX, &ifr);
     addr.can_family = AF_CAN;
     addr.can_ifindex = ifr.ifr_ifindex;
-    rfilter.can_id   = rec_filter;
+    rfilter.can_id = rec_filter;
     rfilter.can_mask = (CAN_EFF_FLAG | CAN_RTR_FLAG | CAN_SFF_MASK);
     setsockopt(cansocket, SOL_CAN_RAW, CAN_RAW_FILTER, &rfilter, sizeof(rfilter));
-    const int bound = bind(cansocket, (struct sockaddr *)&addr, sizeof(addr));
+    const int bound = bind(cansocket, (struct sockaddr*)&addr, sizeof(addr));
     if (bound < 0) {
         printf("Could not bind can socket");
         exit(EXIT_FAILURE);
@@ -320,22 +322,22 @@ void *can2tcp(void *arg) {
 
     canmap_init();
     /* empty */
-    struct connection_data* conn = arg;
-    while(1) {
+    struct connection_data *conn = arg;
+    while (1) {
         /* if websocket is free */
         pthread_mutex_lock(&(conn->canlock));
         const ssize_t nbytes = recv(cansocket, &frame, sizeof(struct can_frame), 0);
         if (nbytes == sizeof(struct can_frame)) {
             const int status = canmap_compute_frame(&(cansocket), &frame);
-            if(status == CANMAP_COMPRET_COMPLETE) {
-                if(canmap_get_frame(&isoframe)) {
+            if (status == CANMAP_COMPRET_COMPLETE) {
+                if (canmap_get_frame(&isoframe)) {
                     memset(sock_send, 0, sizeof(sock_send));
                     canmap_fr2str(sock_send, &isoframe);
                     send(conn->websocket, sock_send, strlen(sock_send), 0);
                     canmap_reset_frame(&isoframe);
                 }
             }
-            else if(status == CANMAP_COMPRET_ERROR) {
+            else if (status == CANMAP_COMPRET_ERROR) {
                 /* msg still in transmission */
             }
         }
@@ -346,17 +348,18 @@ void *can2tcp(void *arg) {
 /*
     Cleans up unused fields in canmap data structure.
     */
-void *canmap_gc(void *arg) {
-    struct connection_data* conn = arg;
+void * canmap_gc(void *arg) {
+    struct connection_data *conn = arg;
     char sock_send[512];
     struct timespec waittime;
     waittime.tv_sec = CANMAP_GC_REFRESH;
     waittime.tv_nsec = 0;
 
-    while(1) {
+    while (1) {
         nanosleep(&waittime, NULL);
         const int id = canmap_clean_garbage();
-        if(id >= 0) { /* gc happened */
+        if (id >= 0) {
+            /* gc happened */
             sprintf(sock_send, "> [error] buffer reset in field %d\n", id);
             send(conn->websocket, sock_send, strlen(sock_send), 0);
         }
