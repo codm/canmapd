@@ -279,6 +279,7 @@ int process_connection(int websock) {
                 canmap_send_frame(&cansocket, &sendframe);
                 canmap_reset_frame(&sendframe);
                 pthread_mutex_unlock(&(conn.canlock));
+		printf("msg: %s\n", webbuff);
             }
         }
     }
