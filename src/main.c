@@ -56,9 +56,6 @@ void sig_term(int sig) {
     /* send sigterm to children */
     kill(0, SIGTERM);
 
-    close(conn.cansocket);
-    close(conn.websocket);
-
     /* closing log */
     syslog(LOG_INFO, "%s", "Shutdown complete");
     closelog();
@@ -267,9 +264,10 @@ int process_connection(int websock) {
         webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, MSG_PEEK);
         if(webbuffsize < 0) {
             printf("error in websock recv\n");
+	    running = 0;
         } else if(webbuffsize == 0) {
             printf("Client disconnected... shutdown\n");
-            sig_term(15);
+            running = 0;
         } else {
             webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, 0);
             webbuff[webbuffsize] = '\0';
