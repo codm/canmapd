@@ -8,3 +8,4 @@ canmapd
 *.o
 .fuse*
 ._*
+.idea
