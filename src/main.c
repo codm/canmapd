@@ -1,14 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
 #include <syslog.h>
 #include <string.h>
 #include <signal.h>
 #include <pthread.h>
 #include <arpa/inet.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -28,10 +26,9 @@ uint8_t rec_filter; /* fiter ID for receiving stuff */
 const char* listenport; /* port where daemon listen for messages TCP->CAN */
 const char* device; /* CAN device */
 
-int process_connection(int socket);
+int process_connection(int websocket);
 void sig_term(int sig);
 void print_helptext();
-int process_connection();
 void *can2tcp(void *arg);
 void *canmap_gc(void *arg);
 
@@ -48,7 +45,7 @@ struct connection_data {
 struct connection_data conn;
 
 const char DAEMON_NAME[] = "canmapd";
-const char DAEMON_VERSION[] = "0.2";
+const char DAEMON_VERSION[] = "0.3";
 
 void sig_chld(int signo) {
     while (waitpid(-1, NULL, WNOHANG) > 0);
@@ -84,12 +81,9 @@ void print_helptext() {
 /*
     main loop
 */
-int main(int argc, const char* argv[]) {
+int main(const int argc, const char* argv[]) {
     /* init vars */
     struct sockaddr_in webclient, webserv;
-    socklen_t len;
-    int newsock, i;
-
     /*
        run code
     */
@@ -101,7 +95,7 @@ int main(int argc, const char* argv[]) {
     listenport = "25025";
     device = "can0";
     rec_filter = 0x00;
-    for(i=0; i < argc; i++) {
+    for(int i = 0; i < argc; i++) {
         if(!strcmp(argv[i], "--verbose") || !strcmp(argv[i], "-v")) {
             verbose = 1;
         }
@@ -121,7 +115,6 @@ int main(int argc, const char* argv[]) {
             rec_filter = (uint8_t)strtol(argv[i], NULL, 10);
         }
         else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
-            i++;
             print_helptext();
             return 0;
         }
@@ -198,43 +191,37 @@ int main(int argc, const char* argv[]) {
         printf("ip:port %s:%d\n", inet_ntoa(webserv.sin_addr), ntohs(webserv.sin_port));
         printf("receive: %d\n", rec_filter);
     }
-    len = sizeof(webclient);
+    socklen_t len = sizeof(webclient);
     while(1) {
-        newsock = accept(conn.websocket, (struct sockaddr*)&webclient, &len);
+        const int newsock = accept(conn.websocket, (struct sockaddr*)&webclient, &len);
         if(newsock > 0) {
             connection = fork();
             if(connection == 0) {
                 /* child */
                 pid = getpid();
                 setpgid(pid, pid);
-                if(verbose)
-                    printf("connection from %s forked into pid %d\n",
-                            inet_ntoa(webclient.sin_addr), (int)pid);
+                if(verbose) {
+                    printf("connection from %s forked into pid %d\n", inet_ntoa(webclient.sin_addr), (int)pid);
+                }
                 conn.webclient = webclient;
                 conn.webserver = webserv;
                 process_connection(newsock);
                 exit(EXIT_SUCCESS);
             }
-            else if(connection < 0) {
-                /* error */
-                syslog(LOG_ERR, "was not able to create process for connection");
-            }
-            /* parent */
+            /* error */
+            syslog(LOG_ERR, "was not able to create process for connection");
             close(newsock);
         }
     }
-    syslog(LOG_INFO, "%s", "daemon successfully shut down");
-    return 0;
 }
 
-int process_connection(int websock) {
+int process_connection(const int websocket) {
     int cansocket;
     struct sockaddr_can addr;
     struct ifreq ifr;
     struct canmap_frame sendframe;
     pthread_t can2tcpthread, cangc;
     char webbuff[WEBSOCK_MAX_RECV];
-    int webbuffsize, running;
 
     /* open CAN Socket */
     /*
@@ -250,10 +237,14 @@ int process_connection(int websock) {
     ioctl(cansocket, SIOCGIFINDEX, &ifr);
     addr.can_family = AF_CAN;
     addr.can_ifindex = ifr.ifr_ifindex;
-    bind(cansocket, (struct sockaddr *)&addr, sizeof(addr));
+    const int bound = bind(cansocket, (struct sockaddr *)&addr, sizeof(addr));
+    if (bound < 0) {
+        printf("Could not bind can socket for connection");
+        exit(EXIT_FAILURE);
+    }
 
     conn.cansocket = cansocket;
-    conn.websocket = websock;
+    conn.websocket = websocket;
 
     /* initialize websocket mutex */
     /* open thread for can_send */
@@ -266,9 +257,9 @@ int process_connection(int websock) {
         perror("can_gc_thread");
         return 0;
     }
-    running = 1;
+    int running = 1;
     while(running) {
-        webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, MSG_PEEK);
+        ssize_t webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, MSG_PEEK);
         if(webbuffsize < 0) {
             printf("error in websock recv\n");
 	    running = 0;
@@ -304,8 +295,6 @@ void *can2tcp(void *arg) {
     struct ifreq ifr;
     struct can_filter rfilter;
 
-    int nbytes;
-    struct connection_data* conn;
     char sock_send[10000];
     struct can_frame frame;
     struct canmap_frame isoframe;
@@ -323,19 +312,21 @@ void *can2tcp(void *arg) {
     rfilter.can_id   = rec_filter;
     rfilter.can_mask = (CAN_EFF_FLAG | CAN_RTR_FLAG | CAN_SFF_MASK);
     setsockopt(cansocket, SOL_CAN_RAW, CAN_RAW_FILTER, &rfilter, sizeof(rfilter));
-    bind(cansocket, (struct sockaddr *)&addr, sizeof(addr));
+    const int bound = bind(cansocket, (struct sockaddr *)&addr, sizeof(addr));
+    if (bound < 0) {
+        printf("Could not bind can socket");
+        exit(EXIT_FAILURE);
+    }
 
     canmap_init();
     /* empty */
-    conn = (struct connection_data*)arg;
+    struct connection_data* conn = arg;
     while(1) {
         /* if websocket is free */
-        nbytes = recv(cansocket, &frame, sizeof(struct can_frame), MSG_PEEK);
         pthread_mutex_lock(&(conn->canlock));
-        nbytes = recv(cansocket, &frame, sizeof(struct can_frame), 0);
+        const ssize_t nbytes = recv(cansocket, &frame, sizeof(struct can_frame), 0);
         if (nbytes == sizeof(struct can_frame)) {
-            int status;
-            status = canmap_compute_frame(&(cansocket), &frame);
+            const int status = canmap_compute_frame(&(cansocket), &frame);
             if(status == CANMAP_COMPRET_COMPLETE) {
                 if(canmap_get_frame(&isoframe)) {
                     memset(sock_send, 0, sizeof(sock_send));
@@ -356,18 +347,15 @@ void *can2tcp(void *arg) {
     Cleans up unused fields in canmap data structure.
     */
 void *canmap_gc(void *arg) {
+    struct connection_data* conn = arg;
+    char sock_send[512];
     struct timespec waittime;
-    struct connection_data* conn;
-    int id;
-
     waittime.tv_sec = CANMAP_GC_REFRESH;
     waittime.tv_nsec = 0;
-    conn = (struct connection_data*)arg;
-    char sock_send[512];
 
     while(1) {
         nanosleep(&waittime, NULL);
-        id = canmap_clean_garbage();
+        const int id = canmap_clean_garbage();
         if(id >= 0) { /* gc happened */
             sprintf(sock_send, "> [error] buffer reset in field %d\n", id);
             send(conn->websocket, sock_send, strlen(sock_send), 0);

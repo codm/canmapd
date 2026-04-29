@@ -91,7 +91,7 @@ void canmap_init();
   @return < 0 for error, 0 if there are still messages to come
             1 if the canmap_frame is finished and ready to get
 */
-int canmap_compute_frame(int *socket, struct can_frame *frame);
+int canmap_compute_frame(const int *socket, const struct can_frame *frame);
 
 /**
   \brief sends an canmap frame over socket
@@ -103,7 +103,7 @@ int canmap_compute_frame(int *socket, struct can_frame *frame);
           EXIT_FAILURE for failure
 
 */
-int canmap_send_frame(int *socket, struct canmap_frame *frame);
+int canmap_send_frame(const int *socket, const struct canmap_frame *frame);
 
 /**
   \brief gets a finished ISO-TP frame for further computation
@@ -117,8 +117,8 @@ int canmap_get_frame(struct canmap_frame *dst);
 
 void canmap_reset_frame(struct canmap_frame *dst);
 
-int canmap_fr2str(char *dst, struct canmap_frame *src);
-int canmap_str2fr(char *src, struct canmap_frame *dst);
+int canmap_fr2str(char *dst, const struct canmap_frame *src);
+int canmap_str2fr(const char *src, struct canmap_frame *dst);
 int canmap_clean_garbage(void);
 
 #endif
