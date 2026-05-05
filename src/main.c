@@ -340,9 +340,9 @@ void * can2tcp(void *arg) {
     struct connection_data *conn = arg;
     while (1) {
         /* if websocket is free */
-        pthread_mutex_lock(&(conn->canlock));
         const ssize_t nbytes = recv(cansocket, &frame, sizeof(struct can_frame), 0);
-        if (nbytes == sizeof(struct can_frame)) {
+        if (nbytes > 0) {
+            pthread_mutex_lock(&(conn->canlock));
             const int status = canmap_compute_frame(&(cansocket), &frame);
             if (status == CANMAP_COMPRET_COMPLETE) {
                 if (canmap_get_frame(&isoframe)) {
@@ -358,8 +358,8 @@ void * can2tcp(void *arg) {
             else if (status == CANMAP_COMPRET_ERROR) {
                 /* msg still in transmission */
             }
+            pthread_mutex_unlock(&(conn->canlock));
         }
-        pthread_mutex_unlock(&(conn->canlock));
     }
 }
 
