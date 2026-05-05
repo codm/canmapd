@@ -35,11 +35,11 @@ void * canmap_gc(void *arg);
 pid_t pid, sid, connection;
 
 struct connection_data {
+    pthread_mutex_t canlock;
     int cansocket;
     int websocket;
     struct sockaddr_in webclient;
     struct sockaddr_in webserver;
-    pthread_mutex_t canlock;
 };
 
 struct connection_data conn;
