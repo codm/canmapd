@@ -124,6 +124,7 @@ int canmap_compute_frame(const int *socket, const struct can_frame *frame) {
         }
 
         /* no free buffer */
+        printf("fatal: no free buffer available\n");
         return CANMAP_COMPRET_ERROR;
     case CANMAP_STATUS_FF:
         /* if first frame */
@@ -141,12 +142,14 @@ int canmap_compute_frame(const int *socket, const struct can_frame *frame) {
             dst->data_iter = 5;
             dst->block_counter = 1;
             if (write(*socket, &flowcontrol, sizeof(struct can_frame)) < 1) {
+                printf("fatal: cannot send flowcontrol frame\n");
                 return CANMAP_COMPRET_ERROR;
             }
             return CANMAP_COMPRET_TRANS;
         }
 
         /* no free buffer */
+        printf("fatal: no free buffer available\n");
         return CANMAP_COMPRET_ERROR;
     case CANMAP_STATUS_CF:
         /* if consecutive frame */
@@ -173,15 +176,19 @@ int canmap_compute_frame(const int *socket, const struct can_frame *frame) {
 
                 /* send flowcontrol */
                 if (write(*socket, &flowcontrol, sizeof(struct can_frame)) < 1) {
+                    printf("fatal: cannot send flowcontrol frame\n");
                     return CANMAP_COMPRET_ERROR;
                 }
             }
             return CANMAP_COMPRET_TRANS;
         }
 
+        /* no buffer found */
+        printf("fatal: no buffer found for consecutive frame\n");
         return CANMAP_COMPRET_ERROR;
     }
     /* if the code comes till here, something is very broken */
+    printf("fatal: frame cannot be processed as canmap frame\n");
     return CANMAP_COMPRET_ERROR;
 }
 
@@ -409,6 +416,7 @@ int canmap_str2fr(const char *src, struct canmap_frame *dst) {
     char *bufbuff = buffer;
     /* TODO: Secure this input via regex */
     if (sscanf(src, "%02x;%02x;%04u;%s", &sender, &rec, &dl, buffer) < 1) {
+        printf("Could not format frame data\n");
         return 0;
     };
     dst->sender = (uint8_t)sender;

@@ -47,19 +47,22 @@ struct connection_data conn;
 const char DAEMON_NAME[] = "canmapd";
 const char DAEMON_VERSION[] = "0.3";
 
+void log_and_print(const int priority, const char *msg) {
+    printf("%s\n", msg);
+    syslog(priority, "%s", msg);
+}
+
 void sig_chld(int signo) {
     while (waitpid(-1, NULL, WNOHANG) > 0);
 }
 
 void sig_term(int sig) {
     /* shutting down program properly */
-    syslog(LOG_INFO, "%s", "Sigterm received - shutting down");
+    log_and_print(LOG_INFO, "Sigterm received - shutting down");
 
     /* send sigterm to children */
     kill(0, SIGTERM);
 
-    /* closing log */
-    syslog(LOG_INFO, "%s", "Shutdown complete");
     closelog();
 
     exit(EXIT_SUCCESS);
@@ -153,7 +156,7 @@ int main(const int argc, const char *argv[]) {
     if (run_daemon) {
         sid = setsid();
         if (sid < 0) {
-            syslog(LOG_ERR, "%s", "was not able to get session id");
+            log_and_print(LOG_ERR, "was not able to get session id");
             exit(EXIT_FAILURE);
         }
     }
@@ -163,7 +166,7 @@ int main(const int argc, const char *argv[]) {
     */
     conn.websocket = socket(AF_INET, SOCK_STREAM, 0);
     if (conn.websocket < 0) {
-        syslog(LOG_ERR, "was not able to initiate websocket");
+        log_and_print(LOG_ERR, "was not able to initiate websocket");
         exit(EXIT_FAILURE);
     }
     /* bind server */
@@ -172,11 +175,11 @@ int main(const int argc, const char *argv[]) {
     webserv.sin_addr.s_addr = inet_addr("127.0.0.1");
     webserv.sin_port = htons(atoi(listenport));
     if (bind(conn.websocket, (struct sockaddr*)&webserv, sizeof(webserv)) < 0) {
-        syslog(LOG_ERR, "was not able to bind webserver");
+        log_and_print(LOG_ERR, "was not able to bind webserver");
         exit(EXIT_FAILURE);
     }
     if (listen(conn.websocket, 9) < 0) {
-        syslog(LOG_ERR, "not able to register listen");
+        log_and_print(LOG_ERR, "not able to register listen");
         exit(EXIT_FAILURE);
     }
 
@@ -185,7 +188,10 @@ int main(const int argc, const char *argv[]) {
     /* install sighandle for main process */
     signal(SIGTERM, sig_term);
     signal(SIGINT, sig_term);
-    syslog(LOG_INFO, "%s (%s - built %s %s) started", DAEMON_NAME, DAEMON_VERSION, __DATE__, __TIME__);
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer),"%s (%s - built %s %s) started", DAEMON_NAME, DAEMON_VERSION, __DATE__, __TIME__);
+    log_and_print(LOG_INFO, buffer);
+
     if (verbose) {
         printf("%s (%s - built %s %s) started %d\n", DAEMON_NAME, DAEMON_VERSION, __DATE__, __TIME__, (int)pid);
         printf("ip:port %s:%d\n", inet_ntoa(webserv.sin_addr), ntohs(webserv.sin_port));
@@ -209,7 +215,7 @@ int main(const int argc, const char *argv[]) {
                 exit(EXIT_SUCCESS);
             }
             /* error */
-            syslog(LOG_ERR, "was not able to create process for connection");
+            log_and_print(LOG_ERR, "was not able to create process for connection");
             close(newsock);
         }
     }
@@ -230,7 +236,7 @@ int process_connection(const int websocket) {
     */
     cansocket = socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if (cansocket < 0) {
-        syslog(LOG_ERR, "was not able to init cansock");
+        log_and_print(LOG_ERR, "was not able to init cansock");
         exit(EXIT_FAILURE);
     }
     strcpy(ifr.ifr_name, device);
@@ -239,7 +245,7 @@ int process_connection(const int websocket) {
     addr.can_ifindex = ifr.ifr_ifindex;
     const int bound = bind(cansocket, (struct sockaddr*)&addr, sizeof(addr));
     if (bound < 0) {
-        printf("Could not bind can socket for connection");
+        printf("Could not bind can socket for connection\n");
         exit(EXIT_FAILURE);
     }
 
@@ -277,9 +283,11 @@ int process_connection(const int websocket) {
             if (canmap_str2fr(webbuff, &sendframe) > 0) {
                 pthread_mutex_lock(&(conn.canlock));
                 canmap_send_frame(&cansocket, &sendframe);
+                if (verbose) {
+                    printf("[Master -> Slave] send msg: %s\n", webbuff);
+                }
                 canmap_reset_frame(&sendframe);
                 pthread_mutex_unlock(&(conn.canlock));
-                printf("msg: %s\n", webbuff);
             }
         }
     }
@@ -304,7 +312,7 @@ void * can2tcp(void *arg) {
     /* experimental for second receiving socket */
     cansocket = socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if (cansocket < 0) {
-        syslog(LOG_ERR, "was not able to init cansock");
+        log_and_print(LOG_ERR, "was not able to init cansock");
         exit(EXIT_FAILURE);
     }
     strcpy(ifr.ifr_name, device);
@@ -333,6 +341,9 @@ void * can2tcp(void *arg) {
                 if (canmap_get_frame(&isoframe)) {
                     memset(sock_send, 0, sizeof(sock_send));
                     canmap_fr2str(sock_send, &isoframe);
+                    if (verbose) {
+                        printf("[Slave -> Master] send msg: %s", sock_send);
+                    }
                     send(conn->websocket, sock_send, strlen(sock_send), 0);
                     canmap_reset_frame(&isoframe);
                 }
