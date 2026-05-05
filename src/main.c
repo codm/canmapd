@@ -301,13 +301,13 @@ int process_connection(const int websocket) {
 void * can2tcp(void *arg) {
     /* experimental for second receiving socket */
     int cansocket;
-    struct sockaddr_can addr;
-    struct ifreq ifr;
-    struct can_filter rfilter;
+    struct sockaddr_can addr = {0};
+    struct ifreq ifr = {0};
+    struct can_filter rfilter = {0};
 
-    char sock_send[10000];
-    struct can_frame frame;
-    struct canmap_frame isoframe;
+    char sock_send[10000] = {0};
+    struct can_frame frame = {0};
+    struct canmap_frame isoframe = {0};
 
     /* experimental for second receiving socket */
     cansocket = socket(PF_CAN, SOCK_RAW, CAN_RAW);

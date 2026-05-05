@@ -211,15 +211,18 @@ int canmap_get_frame(struct canmap_frame *dst) {
 }
 
 int canmap_send_frame(const int *socket, const struct canmap_frame *frame) {
-    struct can_frame sframe, recvfc;
-    unsigned int i, fc_blocksize, fc_minseptime;
-    fd_set rfds;
-    struct timeval tv;
-    struct timespec wait;
+    struct can_frame sframe = {0};
+    struct can_frame recvfc = {0};
+    struct timespec wait = {0};
+    unsigned int fc_blocksize = 1;
+    unsigned int fc_minseptime = 0;
 
+    fd_set rfds;
     /* zero rfds and 10000 usec wait */
     FD_ZERO(&rfds);
     FD_SET(*socket, &rfds);
+
+    struct timeval tv;
     tv.tv_sec = 5;
     tv.tv_usec = 0;
 
@@ -230,7 +233,7 @@ int canmap_send_frame(const int *socket, const struct canmap_frame *frame) {
         sframe.can_dlc = frame->dl + 2;
         sframe.data[0] = frame->sender;
         sframe.data[1] = (CANMAP_STATUS_SF << 4) | frame->dl;
-        for (i = 0; i < frame->dl; i++) {
+        for (int i = 0; i < frame->dl; i++) {
             sframe.data[i + 2] = *datainc++;
         }
         const unsigned int r = write(*socket, &sframe, sizeof(struct can_frame));
@@ -243,7 +246,7 @@ int canmap_send_frame(const int *socket, const struct canmap_frame *frame) {
     sframe.data[0] = frame->sender;
     sframe.data[1] = (CANMAP_STATUS_FF << 4) | ((frame->dl & 0x0F00) >> 8);
     sframe.data[2] = frame->dl & 0x00FF;
-    for (i = 3; i < 8; i++) {
+    for (int i = 3; i < 8; i++) {
         sframe.data[i] = *datainc++;
         bytes_remain--;
     }
@@ -279,7 +282,7 @@ int canmap_send_frame(const int *socket, const struct canmap_frame *frame) {
             sframe.can_dlc = 8;
             sframe.data[0] = frame->sender;
             sframe.data[1] = (CANMAP_STATUS_CF << 4) | block_count;
-            for (i = 2; i < 8; i++) {
+            for (int i = 2; i < 8; i++) {
                 sframe.data[i] = *datainc++;
                 bytes_remain--;
             }
@@ -312,7 +315,7 @@ int canmap_send_frame(const int *socket, const struct canmap_frame *frame) {
             sframe.can_dlc = j;
             sframe.data[0] = frame->sender;
             sframe.data[1] = (CANMAP_STATUS_CF << 4) | block_count;
-            for (i = 2; i < j; i++) {
+            for (int i = 2; i < j; i++) {
                 sframe.data[i] = *datainc++;
                 bytes_remain--;
             }
