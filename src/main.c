@@ -161,6 +161,11 @@ int main(const int argc, const char *argv[]) {
         }
     }
 
+    /**
+     * Mutex
+     **/
+    pthread_mutex_init(&conn.canlock, NULL);
+
     /*
        WEBSOCKET
     */
