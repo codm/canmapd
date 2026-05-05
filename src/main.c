@@ -175,6 +175,9 @@ int main(const int argc, const char *argv[]) {
         exit(EXIT_FAILURE);
     }
     /* bind server */
+    const int opt = 1;
+    setsockopt(conn.websocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
     memset(&webserv, 0, sizeof(webserv));
     webserv.sin_family = AF_INET;
     webserv.sin_addr.s_addr = inet_addr("127.0.0.1");
