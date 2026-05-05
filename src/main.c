@@ -213,7 +213,6 @@ int main(const int argc, const char *argv[]) {
             if (connection == 0) {
                 /* child */
                 pid = getpid();
-                setpgid(pid, pid);
                 if (verbose) {
                     printf("connection from %s forked into pid %d\n", inet_ntoa(webclient.sin_addr), (int)pid);
                 }
