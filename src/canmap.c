@@ -102,6 +102,8 @@ int canmap_compute_frame(const int *socket, const struct can_frame *frame) {
     flowcontrol.data[3] = CANMAP_MIN_SEP_TIME;
 
     switch (status) {
+    case CANMAP_STATUS_FC:
+        return CANMAP_COMPRET_TRANS;
     case CANMAP_STATUS_SF:
         /* if single frame */
         if (_buff_get_next_free(&dst)) {
