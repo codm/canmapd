@@ -60,9 +60,6 @@ void sig_term(int sig) {
     /* shutting down program properly */
     log_and_print(LOG_INFO, "Sigterm received - shutting down");
 
-    /* send sigterm to children */
-    kill(0, SIGTERM);
-
     closelog();
 
     exit(EXIT_SUCCESS);
