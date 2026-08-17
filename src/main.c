@@ -268,32 +268,33 @@ int process_connection(const int websocket) {
         return 0;
     }
     int running = 1;
-    while (running) {
-        ssize_t webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, MSG_PEEK);
-        if (webbuffsize < 0) {
+    FILE *webstream = fdopen(dup(conn.websocket), "r");
+    if (webstream == NULL) {
+        perror("fdopen");
+        running = 0;
+    }
+    while (running && fgets(webbuff, sizeof(webbuff), webstream) != NULL) {
+        if (strcmp("<exit>\n", webbuff) == 0) {
+            running = 0;
+        }
+        else if (canmap_str2fr(webbuff, &sendframe) > 0) {
+            pthread_mutex_lock(&(conn.canlock));
+            canmap_send_frame(&cansocket, &sendframe);
+            if (verbose) {
+                printf("[Master -> Slave] send msg: %s", webbuff);
+            }
+            canmap_reset_frame(&sendframe);
+            pthread_mutex_unlock(&(conn.canlock));
+        }
+    }
+    if (webstream != NULL) {
+        if (ferror(webstream)) {
             printf("error in websock recv\n");
-            running = 0;
         }
-        else if (webbuffsize == 0) {
+        else if (running) {
             printf("Client disconnected... shutdown\n");
-            running = 0;
         }
-        else {
-            webbuffsize = recv(conn.websocket, webbuff, WEBSOCK_MAX_RECV, 0);
-            webbuff[webbuffsize] = '\0';
-            if (strcmp("<exit>\n", webbuff) == 0) {
-                running = 0;
-            }
-            if (canmap_str2fr(webbuff, &sendframe) > 0) {
-                pthread_mutex_lock(&(conn.canlock));
-                canmap_send_frame(&cansocket, &sendframe);
-                if (verbose) {
-                    printf("[Master -> Slave] send msg: %s\n", webbuff);
-                }
-                canmap_reset_frame(&sendframe);
-                pthread_mutex_unlock(&(conn.canlock));
-            }
-        }
+        fclose(webstream);
     }
 
     /* close */
